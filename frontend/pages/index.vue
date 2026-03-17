@@ -24,11 +24,48 @@
           </svg>
         </button>
 
-        <SongTable :songs="displaySongs" :page-title="pageTitle" :layout-mode="layoutMode" @editPlaylist="showEditModal = true" />
+        <SongTable
+            v-if="plStore.activePlaylistId !== 'recent' && plStore.activePlaylistId !== 'community'"
+            :songs="displaySongs"
+            :page-title="pageTitle"
+            :layout-mode="layoutMode"
+            @editPlaylist="showEditModal = true"
+        />
+
+        <div v-else-if="plStore.activePlaylistId === 'recent'" class="recent-view-container">
+          <div class="recent-tabs-header">
+            <div class="recent-tab" :class="{ active: recentActiveTab === 'music' }" @click="recentActiveTab = 'music'">
+              <span>音乐</span><sup class="tab-count">{{ store.recentSongs.length }}</sup>
+            </div>
+            <div class="recent-tab" :class="{ active: recentActiveTab === 'community' }" @click="recentActiveTab = 'community'">
+              <span>社区</span><sup class="tab-count">0</sup>
+            </div>
+          </div>
+          <div class="recent-content">
+            <div v-show="recentActiveTab === 'music'" class="tab-pane">
+              <SongTable :songs="store.recentSongs" page-title="最近播放记录" layout-mode="list" />
+            </div>
+            <div v-show="recentActiveTab === 'community'" class="tab-pane community-placeholder">
+              <div class="placeholder-content liquid-card">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48" class="ghost-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <h3>社区板块建设中</h3>
+                <p>这里将成为律动者的精神角落...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="plStore.activePlaylistId === 'community'" class="community-wrapper" style="height: 100%; width: 100%; overflow: hidden;">
+          <CommunityView @toggle-modal="onCommunityModalToggle" />
+        </div>
+
       </div>
     </div>
 
-    <PlayerBar @seek="onSeek" @volume="onVolume" />
+    <Transition name="slide-down">
+      <PlayerBar v-show="!hidePlayerBar" @seek="onSeek" @volume="onVolume" />
+    </Transition>
+
     <LyricView @seek="onSeek" @volume="onVolume" />
 
     <CreatePlaylistModal
@@ -54,6 +91,7 @@ import PlayerBar from '~/components/player/PlayerBar.vue'
 import LyricView from '~/components/player/LyricView.vue'
 import CreatePlaylistModal from '~/components/playlist/CreatePlaylistModal.vue'
 import EditPlaylistModal from '~/components/playlist/EditPlaylistModal.vue'
+import CommunityView from '~/components/community/CommunityView.vue'
 
 const store = usePlayerStore()
 const plStore = usePlaylistStore()
@@ -63,6 +101,12 @@ const allSongs = ref([])
 const showCreateModal = ref(false)
 const sidebarOpen = ref(false)
 const showEditModal = ref(false)
+//关闭播放栏
+const hidePlayerBar = ref(false)
+function onCommunityModalToggle(isOpen) {
+  hidePlayerBar.value = isOpen
+}
+const recentActiveTab = ref('music')  // 最近
 
 onMounted(async () => {
   try {
@@ -85,6 +129,10 @@ const displaySongs = computed(() => {
   if (!playlist) return allSongs.value
   return playlist.songIds.map(id => allSongs.value.find(s => s.id === id)).filter(Boolean)
 })
+
+watch(displaySongs, (songs) => {
+  store.setPlaylist(songs)
+}, { immediate: false })
 
 const pageTitle = computed(() => {
   const playlist = plStore.activePlaylist
@@ -182,4 +230,104 @@ function onGlobalKey(e) {
   .orb-b { min-width: 22rem; min-height: 22rem; }
   .orb-c { min-width: 16rem; min-height: 16rem; }
 }
+
+/* ===== 最近  UI ===== */
+/* =========================================
+   最近视图 (Recent View) 高级 Tab 样式
+   ========================================= */
+.recent-view-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  /* 左侧留出 64px 适配移动端汉堡菜单 */
+  padding: 32px 32px 16px 64px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.recent-tab {
+  position: relative;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding-bottom: 8px; /* 底部给红线留空间 */
+}
+
+/* 上标数字角标 */
+.tab-count {
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 4px;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+/* 激活状态：字体放大，颜色变亮 */
+.recent-tab.active {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.recent-tab.active .tab-count {
+  color: var(--text-secondary);
+}
+
+/* 底部红色下划线动画 */
+.recent-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 24px;
+  height: 4px;
+  background: linear-gradient(90deg, #fa2d48, #ff7e5f); /* 你的主题渐变色 */
+  border-radius: 2px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.recent-tab.active::after {
+  transform: translateX(-50%) scaleX(1);
+}
+
+/* 内容区 */
+.recent-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-pane {
+  height: 100%;
+}
+
+/* 社区占位符 */
+.community-placeholder { display: flex; align-items: center; justify-content: center; padding: 32px; }
+.placeholder-content { text-align: center; padding: 64px; border-radius: 24px; border: 1px dashed rgba(255,255,255,0.1); background: rgba(255, 255, 255, 0.02); }
+.ghost-icon { color: var(--text-tertiary); margin-bottom: 16px; }
+.placeholder-content h3 { font-size: 20px; color: var(--text-primary); margin-bottom: 8px; font-weight: 700; }
+.placeholder-content p { color: var(--text-secondary); font-size: 14px; }
+
+/* =========================================
+   💡 播放栏下沉收起动画
+   ========================================= */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
 </style>

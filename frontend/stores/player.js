@@ -5,6 +5,8 @@ export const usePlayerStore = defineStore('player', {
     playlist: [],
     currentSong: null,
     currentIndex: -1,
+    playOrder: [],
+    orderCursor: -1,
     isPlaying: false,
     currentTime: 0,
     duration: 0,
@@ -14,6 +16,7 @@ export const usePlayerStore = defineStore('player', {
     playMode: 'sequence',
     lyricMode: 'line',
     showLyricView: false,
+    recentSongs: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : [],// 为了搭建 ”最近“板块 新增：最近播放列表（安全读取本地存储）
   }),
 
   getters: {
@@ -43,43 +46,138 @@ export const usePlayerStore = defineStore('player', {
     },
     formattedCurrentTime(state) { return formatTime(state.currentTime) },
     formattedDuration(state) { return formatTime(state.duration) },
-    hasNext(state) { return state.currentIndex < state.playlist.length - 1 },
-    hasPrev(state) { return state.currentIndex > 0 },
+    hasNext(state) { return state.playlist.length > 0 },
+    hasPrev(state) { return state.playlist.length > 0 },
   },
 
   actions: {
-    setPlaylist(songs) { this.playlist = songs },
+      setPlaylist(songs) {
+          this.playlist = songs
+          this.updatePlayOrder()
+      },
 
-    async playSong(song, index) {
-      this.currentSong = song
-      this.currentIndex = index
-      this.currentTime = 0
-      this.isPlaying = true
-      await this.loadLyrics(song.id)
-    },
+      updatePlayOrder() {
+          const n = this.playlist.length
+          if (n === 0) {
+              this.playOrder = []
+              this.orderCursor = -1
+              return
+          }
 
-    async loadLyrics(songId) {
-      try {
-        const res = await fetch(`/api/songs/${songId}/lyrics`)
-        if (res.ok) {
-          this.lyricsText = await res.text()
-          this.parsedLyrics = parseLrc(this.lyricsText)
-        } else {
+          if (this.playMode === 'shuffle') {
+              // 洗牌模式：当前歌曲固定在最前面，剩下的打乱
+              const rest = []
+              for (let i = 0; i < n; i++) {
+                  if (i !== this.currentIndex) rest.push(i)
+              }
+              // Fisher-Yates 洗牌算法
+              for (let i = rest.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [rest[i], rest[j]] = [rest[j], rest[i]]
+              }
+              this.playOrder = this.currentIndex >= 0 ? [this.currentIndex, ...rest] : rest
+              this.orderCursor = this.currentIndex >= 0 ? 0 : -1
+          } else {
+              // 顺序/循环模式：标准的 0 到 n-1
+              this.playOrder = Array.from({length: n}, (_, i) => i)
+              this.orderCursor = this.currentIndex >= 0 ? this.currentIndex : -1
+          }
+      },
+
+      // 💡 3. 切换模式时，立刻重新生成队列
+      togglePlayMode() {
+          const modes = ['sequence', 'loop-all', 'loop-one', 'shuffle']
+          const i = modes.indexOf(this.playMode)
+          this.playMode = modes[(i + 1) % modes.length]
+          this.updatePlayOrder()
+      },
+
+      async playSong(song, index) {
+          this.currentSong = song
+          this.currentIndex = index
+          this.currentTime = 0
+          this.isPlaying = true
+
+          // 同步 orderCursor
+          const cursor = this.playOrder.indexOf(index)
+          if (cursor !== -1) {
+              this.orderCursor = cursor
+          } else {
+              this.updatePlayOrder() // 兜底：如果是第一次加载
+          }
+
+          // 为添加 最近 新增：每次播放新歌时，记录到最近播放
+          this.addRecentSong(song)
+
+          await this.loadLyrics(song.id)
+      },
+      addRecentSong(song) {
+          // 过滤掉已存在的同一首歌，提置顶
+          this.recentSongs = this.recentSongs.filter(s => s.id !== song.id)
+          this.recentSongs.unshift(song)
+          // 限制 100 首防止爆内存
+          if (this.recentSongs.length > 100) this.recentSongs.pop()
+          // 持久化到本地
+          if (typeof window !== 'undefined') {
+              localStorage.setItem('recentSongs', JSON.stringify(this.recentSongs))
+          }
+      },
+      async loadLyrics(songId) {
+        try {
+          const res = await fetch(`/api/songs/${songId}/lyrics`)
+          if (res.ok) {
+            this.lyricsText = await res.text()
+            this.parsedLyrics = parseLrc(this.lyricsText)
+          } else {
+            this.lyricsText = ''
+            this.parsedLyrics = []
+          }
+        } catch {
           this.lyricsText = ''
           this.parsedLyrics = []
         }
-      } catch {
-        this.lyricsText = ''
-        this.parsedLyrics = []
-      }
-    },
+      },
 
-    async nextSong() {
-      if (this.hasNext) await this.playSong(this.playlist[this.currentIndex + 1], this.currentIndex + 1)
-    },
-    async prevSong() {
-      if (this.hasPrev) await this.playSong(this.playlist[this.currentIndex - 1], this.currentIndex - 1)
-    },
+      async nextSong(isAutoEnd = false) {
+          if (!this.playlist.length || this.orderCursor === -1) return
+
+          let nextCursor = this.orderCursor + 1
+
+          if (nextCursor < this.playOrder.length) {
+              // 还没播完队列，正常下一首
+              const nextIdx = this.playOrder[nextCursor]
+              await this.playSong(this.playlist[nextIdx], nextIdx)
+          } else {
+              // 队列播完了（不论是正常的还是洗牌后的）
+              if (this.playMode === 'sequence' && isAutoEnd) {
+                  this.isPlaying = false
+              } else if (this.playMode === 'shuffle') {
+                  // 随机模式播完一轮：重新洗牌，继续循环
+                  this.updatePlayOrder()
+                  const nextIdx = this.playOrder[0]
+                  await this.playSong(this.playlist[nextIdx], nextIdx)
+              } else {
+                  // loop-all：回到队列开头
+                  this.orderCursor = -1
+                  const nextIdx = this.playOrder[0]
+                  await this.playSong(this.playlist[nextIdx], nextIdx)
+              }
+          }
+      },
+      async prevSong() {
+          if (!this.playlist.length || this.orderCursor === -1) return
+
+          let prevCursor = this.orderCursor - 1
+
+          if (prevCursor >= 0) {
+              const prevIdx = this.playOrder[prevCursor]
+              await this.playSong(this.playlist[prevIdx], prevIdx)
+          } else {
+              // 已经是队列第一首，跳到队列最后一首（闭环）
+              const prevIdx = this.playOrder[this.playOrder.length - 1]
+              await this.playSong(this.playlist[prevIdx], prevIdx)
+          }
+      },
     updateTime(time) { this.currentTime = time },
     setDuration(d) { this.duration = d },
     togglePlay() { this.isPlaying = !this.isPlaying },
@@ -90,11 +188,7 @@ export const usePlayerStore = defineStore('player', {
           this.lyricMode = this.lyricMode === 'word' ? 'line' : 'word'
       },
 
-    togglePlayMode() {
-      const modes = ['sequence', 'loop-all', 'loop-one', 'shuffle']
-      const i = modes.indexOf(this.playMode)
-      this.playMode = modes[(i + 1) % modes.length]
-    },
+
   },
 })
 

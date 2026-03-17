@@ -22,6 +22,15 @@
         <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
         <span>全部歌曲</span>
       </a>
+      <a class="nav-item" :class="{ active: plStore.activePlaylistId === 'community' }" @click.prevent="navToCustom('community')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 00-3-3.87"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 010 7.75"></path>
+        </svg>
+        <span>社区</span>
+      </a>
     </nav>
 
     <nav class="nav-section">
@@ -31,9 +40,9 @@
         <span>我喜欢</span>
         <span class="nav-badge" v-if="plStore.favorites?.songIds.length">{{ plStore.favorites.songIds.length }}</span>
       </a>
-      <a class="nav-item" @click.prevent>
+      <a class="nav-item" :class="{ active: plStore.activePlaylistId === 'recent' }" @click.prevent="navToCustom('recent')">
         <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-        <span>最近播放</span>
+        <span>最近</span>
       </a>
     </nav>
 
@@ -91,6 +100,12 @@ function setTheme(mode) {
 
 function navTo(id) {
   plStore.setActivePlaylist(id)
+  setTimeout(() => emit('close'), 200)
+}
+
+// 专门处理特殊路由的跳转函数（避开原有的 store 校验逻辑）   最近 社区
+function navToCustom(id) {
+  plStore.activePlaylistId = id
   setTimeout(() => emit('close'), 200)
 }
 

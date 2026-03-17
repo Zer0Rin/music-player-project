@@ -86,7 +86,15 @@
         <span class="bar-time">{{ store.formattedCurrentTime }} / {{ store.formattedDuration }}</span>
         <div class="volume-group liquid-card">
           <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8.5v7a4.5 4.5 0 0 0 2.5-3.5z"/></svg>
-          <input type="range" min="0" max="1" step="0.01" :value="store.volume" class="vol-slider" @input="e => emit('volume', parseFloat(e.target.value))" />
+
+          <div class="vol-slider-wrapper">
+            <div class="vol-progress-bg"></div>
+            <div class="vol-progress-fill" :style="{ width: (store.volume * 100) + '%' }">
+              <div class="vol-progress-glow"></div>
+            </div>
+            <input type="range" min="0" max="1" step="0.01" :value="store.volume" class="vol-slider-input" @input="e => emit('volume', parseFloat(e.target.value))" />
+          </div>
+
         </div>
       </div>
     </div>
@@ -345,7 +353,15 @@ function openLyrics() { if (store.currentSong) store.openLyricView() }
 .bar-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .bar-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar-title.empty { color: var(--text-tertiary); font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-size: 13px; }
-.bar-artist { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.bar-artist {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block; /* 确保 span 能正确执行宽度的截断 */
+}
 
 .bar-controls { display: flex; align-items: center; gap: 24px; flex-shrink: 0; margin: 0 auto; }
 .ctrl {
@@ -402,10 +418,43 @@ function openLyrics() { if (store.currentSong) store.openLyricView() }
 .bar-time { font-size: 13px; color: var(--text-primary); font-weight: 600; font-family: monospace; letter-spacing: 0.05em; opacity: 0.8; }
 .volume-group { display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 20px; border: none; }
 .vol-icon { color: var(--text-primary); opacity: 0.8; }
-.vol-slider { width: 90px; height: 4px; -webkit-appearance: none; appearance: none; background: rgba(255, 255, 255, 0.15); border-radius: 2px; outline: none; cursor: pointer; transition: background 0.2s ease; }
-.vol-slider:hover { background: rgba(255, 255, 255, 0.25); }
-.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-.vol-slider:hover::-webkit-slider-thumb { transform: scale(1.3); }
+
+
+/* --- 新的音量条样式 --- */
+.volume-group { display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 20px; border: none; }
+.vol-icon { color: var(--text-primary); opacity: 0.8; }
+
+.vol-slider-wrapper {
+  position: relative;
+  width: 90px;
+  height: 20px; /* 增加热区高度，方便鼠标/手指交互 */
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.vol-progress-bg { position: absolute; left: 0; right: 0; height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; transition: height 0.2s ease; }
+.vol-progress-fill { position: absolute; left: 0; height: 4px; background: linear-gradient(90deg, #fa2d48, #ff7e5f); border-radius: 2px; transition: width 0.1s linear, height 0.2s ease; box-shadow: 0 0 8px rgba(250, 45, 72, 0.5); pointer-events: none; }
+.vol-progress-glow { content: ''; position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px #fff, 0 0 20px var(--accent); opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; }
+
+/* Hover 联动变粗及显示发光小球 */
+.vol-slider-wrapper:hover .vol-progress-bg,
+.vol-slider-wrapper:hover .vol-progress-fill { height: 6px; }
+.vol-slider-wrapper:hover .vol-progress-glow { opacity: 1; transform: translateY(-50%) scale(1.2); }
+
+/* 将原生 range input 设为完全透明并置于最顶层，用于捕捉事件 */
+.vol-slider-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  z-index: 2;
+  -webkit-appearance: none;
+  appearance: none;
+}
 
 @media (max-width: 768px) {
   .player-bar { border-radius: 1.5rem 1.5rem 0 0; }

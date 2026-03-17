@@ -591,5 +591,45 @@ function playAll() {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.01));
 }
 
+/* =========================================
+   📱 移动端终极适配 (请务必放在 <style> 的最底部)
+   ========================================= */
+@media (max-width: 768px) {
+  /* 1. 修复 Grid 模式（全部歌曲主页）遮挡 */
+  .page-header.grid-header {
+    /* 上 右 下 左 (左边留出 64px 完美避开汉堡按钮) */
+    padding: 20px 16px 16px 64px;
+  }
+
+  /* 2. 修复 List 模式（我喜欢/歌单详情）遮挡与排版 */
+  .page-header.list-header {
+    padding: 24px 20px 20px 64px;
+    flex-direction: column;       /* 移动端改为垂直排列，避免拥挤 */
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  /* 3. 移动端屏幕变窄，整体向右推移后需要适当缩小封面，防溢出 */
+  .playlist-cover-wrap {
+    width: 140px;
+    height: 140px;
+    border-radius: 16px;
+  }
+
+  .playlist-title {
+    font-size: 28px; /* 移动端标题字号微调 */
+  }
+
+  .playlist-actions {
+    flex-wrap: wrap; /* 允许操作按钮在小屏幕换行 */
+    margin-top: 0;
+  }
+
+  .list-search {
+    align-self: stretch; /* 搜索框拉宽，占满整个容器 */
+    width: 100%;
+    margin-top: 8px;
+  }
+}
 
 </style>

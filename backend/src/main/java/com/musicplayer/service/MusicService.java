@@ -3,12 +3,19 @@ package com.musicplayer.service;
 import com.musicplayer.model.Song;
 import com.musicplayer.repository.SongRepository;
 import jakarta.annotation.PostConstruct;
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.tag.Tag;
+import org.jaudiotagger.tag.FieldKey;
+import org.jaudiotagger.tag.images.Artwork;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,12 +28,10 @@ public class MusicService {
 
     public MusicService(SongRepository songRepository) {
         this.songRepository = songRepository;
+        // 静默 JAudioTagger 的日志输出
+        Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     }
 
-    /**
-     * 启动时扫描 music-data/audio/ 目录
-     * 新增的文件入库，已删除的文件从库中移除
-     */
     @PostConstruct
     public void scanMusicFiles() {
         Path audioDir = Paths.get(musicDataPath, "audio");
@@ -40,63 +45,185 @@ public class MusicService {
                     .filter(p -> {
                         String name = p.toString().toLowerCase();
                         return name.endsWith(".mp3") || name.endsWith(".flac")
-                                || name.endsWith(".wav") || name.endsWith(".ogg");
+                                || name.endsWith(".wav") || name.endsWith(".ogg")
+                                || name.endsWith(".m4a");
                     })
                     .sorted()
                     .collect(Collectors.toList());
 
-            // 当前磁盘上的文件名集合
             Set<String> diskFileNames = audioFiles.stream()
                     .map(p -> p.getFileName().toString())
                     .collect(Collectors.toSet());
 
-            // 数据库中已有的歌曲
             Map<String, Song> dbSongs = songRepository.findAll().stream()
                     .collect(Collectors.toMap(Song::getAudioFile, s -> s, (a, b) -> a));
 
-            // 1. 删除数据库中已不存在于磁盘的歌曲
+            // 删除已不存在的文件
             for (Song dbSong : dbSongs.values()) {
                 if (!diskFileNames.contains(dbSong.getAudioFile())) {
                     songRepository.delete(dbSong);
-                    System.out.println("[MusicService] 已移除（文件不存在）: " + dbSong.getTitle());
+                    System.out.println("[MusicService] 已移除: " + dbSong.getTitle());
                 }
             }
 
-            // 2. 新增或更新歌曲
-            for (int i = 0; i < audioFiles.size(); i++) {
-                Path audioFile = audioFiles.get(i);
+            // 新增或更新歌曲
+            for (Path audioFile : audioFiles) {
                 String fileName = audioFile.getFileName().toString();
                 String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
-                // 用文件名生成稳定 ID（不随文件排序变化）
-                String id = String.valueOf(Math.abs(fileName.hashCode()) % 100000 + 1);
-
-                String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ttml");
-                String coverFile = findFile(Paths.get(musicDataPath, "covers"), baseName, ".jpg", ".png", ".jpeg", ".webp");
 
                 Song existing = dbSongs.get(fileName);
                 if (existing != null) {
-                    // 只更新关联文件，不改 ID
-                    existing.setLyricsFile(lyricsFile);
-                    existing.setCoverFile(coverFile);
+                    // 已有歌曲：只更新外部歌词/封面文件关联（不重新读 ID3，避免覆盖用户修改）
+                    String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ttml");
+                    String coverFile = findFile(Paths.get(musicDataPath, "covers"), baseName, ".jpg", ".png", ".jpeg", ".webp");
+                    if (lyricsFile != null) existing.setLyricsFile(lyricsFile);
+                    if (coverFile != null) existing.setCoverFile(coverFile);
                     songRepository.save(existing);
                 } else {
-                    // 确保 ID 不冲突
-                    while (songRepository.existsById(id)) {
-                        id = String.valueOf(Integer.parseInt(id) + 1);
-                    }
-                    Song song = new Song(id, baseName, "未知艺术家", "未知专辑",
-                            fileName, lyricsFile, coverFile, 0);
+                    // 新歌曲：读取 ID3 标签入库
+                    Song song = createSongFromFile(audioFile);
                     songRepository.save(song);
-                    System.out.println("[MusicService] 新增: " + baseName
-                            + " | 歌词: " + (lyricsFile != null ? "✓" : "✗")
-                            + " | 封面: " + (coverFile != null ? "✓" : "✗"));
+                    System.out.println("[MusicService] 新增: " + song.getTitle()
+                            + " | 艺术家: " + song.getArtist()
+                            + " | 专辑: " + song.getAlbum()
+                            + " | 时长: " + song.getDuration() + "s"
+                            + " | 内嵌封面: " + (song.isHasEmbeddedCover() ? "✓" : "✗")
+                            + " | 歌词: " + (song.getLyricsFile() != null ? "✓" : "✗"));
                 }
             }
 
             System.out.println("[MusicService] 数据库共 " + songRepository.count() + " 首歌曲");
 
         } catch (IOException e) {
-            System.err.println("[MusicService] 扫描音频文件失败: " + e.getMessage());
+            System.err.println("[MusicService] 扫描失败: " + e.getMessage());
+        }
+    }
+
+    /** 从音频文件创建 Song 对象（读取 ID3/FLAC 标签） */
+    private Song createSongFromFile(Path audioFile) {
+        String fileName = audioFile.getFileName().toString();
+        String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+        String id = String.valueOf(Math.abs(fileName.hashCode()) % 100000 + 1);
+
+        // 确保 ID 不冲突
+        while (songRepository.existsById(id)) {
+            id = String.valueOf(Integer.parseInt(id) + 1);
+        }
+
+        // 外部歌词和封面文件
+        String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ttml");
+        String coverFile = findFile(Paths.get(musicDataPath, "covers"), baseName, ".jpg", ".png", ".jpeg", ".webp");
+
+        // 默认值（文件名做标题）
+        String title = baseName;
+        String artist = "";
+        String album = "";
+        String genre = "";
+        String year = "";
+        int duration = 0;
+        boolean hasEmbeddedCover = false;
+        boolean hasEmbeddedLyrics = false;
+
+        try {
+            AudioFile af = AudioFileIO.read(audioFile.toFile());
+
+            // 读取时长
+            duration = af.getAudioHeader().getTrackLength();
+
+            // 读取标签
+            Tag tag = af.getTag();
+            if (tag != null) {
+                String t;
+
+                t = tag.getFirst(FieldKey.TITLE);
+                if (t != null && !t.isBlank()) title = t.trim();
+
+                t = tag.getFirst(FieldKey.ARTIST);
+                if (t != null && !t.isBlank()) artist = t.trim();
+
+                t = tag.getFirst(FieldKey.ALBUM);
+                if (t != null && !t.isBlank()) album = t.trim();
+
+                t = tag.getFirst(FieldKey.GENRE);
+                if (t != null && !t.isBlank()) genre = t.trim();
+
+                t = tag.getFirst(FieldKey.YEAR);
+                if (t != null && !t.isBlank()) year = t.trim();
+
+                // 内嵌封面
+                Artwork artwork = tag.getFirstArtwork();
+                if (artwork != null && artwork.getBinaryData() != null && artwork.getBinaryData().length > 0) {
+                    hasEmbeddedCover = true;
+                    // 如果没有外部封面文件，把内嵌封面导出到 covers 目录
+                    if (coverFile == null) {
+                        coverFile = exportEmbeddedCover(baseName, artwork);
+                    }
+                }
+
+                // 内嵌歌词（LYRICS / UNSYNC_LYRICS）
+                t = tag.getFirst(FieldKey.LYRICS);
+                if (t != null && !t.isBlank()) {
+                    hasEmbeddedLyrics = true;
+                    // 如果没有外部歌词文件，把内嵌歌词导出到 lyrics 目录
+                    if (lyricsFile == null) {
+                        lyricsFile = exportEmbeddedLyrics(baseName, t);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[MusicService] 读取标签失败 (" + fileName + "): " + e.getMessage());
+        }
+
+        Song song = new Song(id, title, artist, album, fileName, lyricsFile, coverFile, duration);
+        song.setGenre(genre);
+        song.setYear(year);
+        song.setHasEmbeddedCover(hasEmbeddedCover);
+        song.setHasEmbeddedLyrics(hasEmbeddedLyrics);
+        return song;
+    }
+
+    /** 导出内嵌封面到 covers 目录 */
+    private String exportEmbeddedCover(String baseName, Artwork artwork) {
+        try {
+            Path coverDir = Paths.get(musicDataPath, "covers");
+            Files.createDirectories(coverDir);
+
+            String mimeType = artwork.getMimeType();
+            String ext = ".jpg";
+            if (mimeType != null) {
+                if (mimeType.contains("png")) ext = ".png";
+                else if (mimeType.contains("webp")) ext = ".webp";
+            }
+
+            String coverFileName = baseName + ext;
+            Path coverPath = coverDir.resolve(coverFileName);
+            if (!Files.exists(coverPath)) {
+                Files.write(coverPath, artwork.getBinaryData());
+                System.out.println("[MusicService] 导出内嵌封面: " + coverFileName);
+            }
+            return coverFileName;
+        } catch (Exception e) {
+            System.err.println("[MusicService] 导出封面失败: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** 导出内嵌歌词到 lyrics 目录 */
+    private String exportEmbeddedLyrics(String baseName, String lyricsContent) {
+        try {
+            Path lyricsDir = Paths.get(musicDataPath, "lyrics");
+            Files.createDirectories(lyricsDir);
+
+            String lyricsFileName = baseName + ".lrc";
+            Path lyricsPath = lyricsDir.resolve(lyricsFileName);
+            if (!Files.exists(lyricsPath)) {
+                Files.writeString(lyricsPath, lyricsContent);
+                System.out.println("[MusicService] 导出内嵌歌词: " + lyricsFileName);
+            }
+            return lyricsFileName;
+        } catch (Exception e) {
+            System.err.println("[MusicService] 导出歌词失败: " + e.getMessage());
+            return null;
         }
     }
 
@@ -109,27 +236,11 @@ public class MusicService {
         return null;
     }
 
-    public List<Song> getAllSongs() {
-        return songRepository.findAll();
-    }
+    public List<Song> getAllSongs() { return songRepository.findAll(); }
+    public Optional<Song> getSongById(String id) { return songRepository.findById(id); }
+    public Song saveSong(Song song) { return songRepository.save(song); }
 
-    public Optional<Song> getSongById(String id) {
-        return songRepository.findById(id);
-    }
-
-    public Song saveSong(Song song) {
-        return songRepository.save(song);
-    }
-
-    public Path getAudioPath(String fileName) {
-        return Paths.get(musicDataPath, "audio", fileName);
-    }
-
-    public Path getLyricsPath(String fileName) {
-        return Paths.get(musicDataPath, "lyrics", fileName);
-    }
-
-    public Path getCoverPath(String fileName) {
-        return Paths.get(musicDataPath, "covers", fileName);
-    }
+    public Path getAudioPath(String fileName) { return Paths.get(musicDataPath, "audio", fileName); }
+    public Path getLyricsPath(String fileName) { return Paths.get(musicDataPath, "lyrics", fileName); }
+    public Path getCoverPath(String fileName) { return Paths.get(musicDataPath, "covers", fileName); }
 }

@@ -19,7 +19,10 @@ export default defineNuxtConfig({
       storesDirs: ['~/stores'],
     }],
     '@nuxtjs/google-fonts',
+    '@nuxtjs/tailwindcss'
   ],
+
+
 
   imports: {
     dirs: ['stores'],
@@ -44,5 +47,7 @@ export default defineNuxtConfig({
     },
   },
 
+
   compatibilityDate: '2024-04-03',
+
 })

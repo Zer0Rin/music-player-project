@@ -71,36 +71,15 @@ export function useAudioPlayer() {
 
   /** 播放结束处理（根据播放模式） */
   function handlePlayEnd() {
-    switch (store.playMode) {
-      case 'loop-one':
-        // 单曲循环
-        if (_audio) {
-          _audio.currentTime = 0
-          _audio.play().catch(console.error)
-          store.isPlaying = true
-        }
-        break
-      case 'loop-all':
-        // 列表循环
-        if (store.hasNext) {
-          store.nextSong()
-        } else if (store.playlist.length > 0) {
-          store.playSong(store.playlist[0], 0)
-        }
-        break
-      case 'shuffle':
-        // 随机播放
-        if (store.playlist.length > 1) {
-          let idx
-          do { idx = Math.floor(Math.random() * store.playlist.length) }
-          while (idx === store.currentIndex)
-          store.playSong(store.playlist[idx], idx)
-        }
-        break
-      default: // 'sequence'
-        store.nextSong()
-        break
-    }
+      if (store.playMode === 'loop-one') {
+          if (_audio) {
+              _audio.currentTime = 0
+              _audio.play().catch(console.error)
+              store.isPlaying = true
+          }
+      } else {
+          store.nextSong(true) // 传 true，告知是自然播完
+      }
   }
 
 

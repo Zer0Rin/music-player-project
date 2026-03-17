@@ -12,10 +12,14 @@ public class Song {
     private String title;
     private String artist;
     private String album;
+    private String genre;
+    private String year;
     private String audioFile;
     private String lyricsFile;
     private String coverFile;
-    private int duration;
+    private int duration;           // 秒
+    private boolean hasEmbeddedCover;   // 音频文件内嵌封面
+    private boolean hasEmbeddedLyrics;  // 音频文件内嵌歌词
 
     public Song() {}
 
@@ -43,6 +47,12 @@ public class Song {
     public String getAlbum() { return album; }
     public void setAlbum(String album) { this.album = album; }
 
+    public String getGenre() { return genre; }
+    public void setGenre(String genre) { this.genre = genre; }
+
+    public String getYear() { return year; }
+    public void setYear(String year) { this.year = year; }
+
     public String getAudioFile() { return audioFile; }
     public void setAudioFile(String audioFile) { this.audioFile = audioFile; }
 
@@ -54,4 +64,10 @@ public class Song {
 
     public int getDuration() { return duration; }
     public void setDuration(int duration) { this.duration = duration; }
+
+    public boolean isHasEmbeddedCover() { return hasEmbeddedCover; }
+    public void setHasEmbeddedCover(boolean hasEmbeddedCover) { this.hasEmbeddedCover = hasEmbeddedCover; }
+
+    public boolean isHasEmbeddedLyrics() { return hasEmbeddedLyrics; }
+    public void setHasEmbeddedLyrics(boolean hasEmbeddedLyrics) { this.hasEmbeddedLyrics = hasEmbeddedLyrics; }
 }
