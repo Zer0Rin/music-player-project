@@ -145,5 +145,4 @@ audio.currentTime → requestAnimationFrame 每帧检查
 - [ ] 接入 AMLL Vue 组件（逐字歌词动画）
 - [ ] PixiJS 流体背景（更接近真实 Apple Music）
 - [ ] 歌词搜索 API（从网络获取歌词）
-- [ ] 用户系统 + 收藏 + 播放历史
-- [ ] 响应式移动端适配
+
