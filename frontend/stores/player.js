@@ -123,19 +123,14 @@ export const usePlayerStore = defineStore('player', {
           }
       },
       async loadLyrics(songId) {
-        try {
-          const res = await fetch(`/api/songs/${songId}/lyrics`)
-          if (res.ok) {
-            this.lyricsText = await res.text()
-            this.parsedLyrics = parseLrc(this.lyricsText)
-          } else {
-            this.lyricsText = ''
-            this.parsedLyrics = []
+          try {
+              const { $apiFetch } = useNuxtApp()
+              this.lyricsText = await $apiFetch(`/api/songs/${songId}/lyrics`)
+              this.parsedLyrics = parseLrc(this.lyricsText)
+          } catch {
+              this.lyricsText = ''
+              this.parsedLyrics = []
           }
-        } catch {
-          this.lyricsText = ''
-          this.parsedLyrics = []
-        }
       },
 
       async nextSong(isAutoEnd = false) {

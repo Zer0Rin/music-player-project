@@ -5,6 +5,7 @@ import com.musicplayer.service.PlaylistService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,15 +18,15 @@ import java.util.Map;
 public class PlaylistController {
 
     private final PlaylistService playlistService;
-    private static final long MAX_COVER_SIZE = 7 * 1024 * 1024; // 7MB
+    private static final long MAX_COVER_SIZE = 7 * 1024 * 1024;
 
     public PlaylistController(PlaylistService playlistService) {
         this.playlistService = playlistService;
     }
 
     @GetMapping
-    public List<Playlist> listPlaylists() {
-        return playlistService.getAllPlaylists();
+    public List<Playlist> listPlaylists(Authentication auth) {
+        return playlistService.getAllPlaylists(auth.getName());
     }
 
     @GetMapping("/{id}")
@@ -35,41 +36,30 @@ public class PlaylistController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 创建歌单（JSON body: name, description, tags） */
     @PostMapping
-    public Playlist createPlaylist(@RequestBody Map<String, Object> body) {
+    public Playlist createPlaylist(@RequestBody Map<String, Object> body, Authentication auth) {
         String name = (String) body.getOrDefault("name", "新建歌单");
         String description = (String) body.getOrDefault("description", "");
         @SuppressWarnings("unchecked")
         List<String> tags = (List<String>) body.get("tags");
-        return playlistService.createPlaylist(name, description, tags);
+        return playlistService.createPlaylist(name, description, tags, auth.getName());
     }
 
-    /** 上传歌单封面（裁剪后的图片） */
     @PostMapping("/{id}/cover")
     public ResponseEntity<Map<String, String>> uploadCover(
             @PathVariable String id,
             @RequestParam("file") MultipartFile file) {
-
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "文件为空"));
-        }
-        if (file.getSize() > MAX_COVER_SIZE) {
-            return ResponseEntity.badRequest().body(Map.of("error", "文件超过7MB限制"));
-        }
-
+        if (file.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "文件为空"));
+        if (file.getSize() > MAX_COVER_SIZE) return ResponseEntity.badRequest().body(Map.of("error", "文件超过7MB限制"));
         try {
             String fileName = playlistService.saveCoverImage(id, file.getBytes(), file.getOriginalFilename());
-            if (fileName != null) {
-                return ResponseEntity.ok(Map.of("coverImage", fileName));
-            }
+            if (fileName != null) return ResponseEntity.ok(Map.of("coverImage", fileName));
             return ResponseEntity.internalServerError().body(Map.of("error", "保存失败"));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
-    /** 获取歌单封面图片 */
     @GetMapping("/{id}/cover")
     public ResponseEntity<Resource> getCover(@PathVariable String id) {
         return playlistService.getPlaylist(id)
@@ -77,7 +67,6 @@ public class PlaylistController {
                 .map(pl -> {
                     Path path = playlistService.getCoverImagePath(pl.getCoverImage());
                     if (!Files.exists(path)) return ResponseEntity.notFound().<Resource>build();
-
                     Resource resource = new FileSystemResource(path);
                     String ext = pl.getCoverImage().substring(pl.getCoverImage().lastIndexOf('.') + 1).toLowerCase();
                     MediaType mediaType = switch (ext) {
@@ -90,7 +79,6 @@ public class PlaylistController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 删除歌单封面 */
     @DeleteMapping("/{id}/cover")
     public ResponseEntity<Void> deleteCover(@PathVariable String id) {
         return playlistService.getPlaylist(id).map(pl -> {
@@ -121,7 +109,6 @@ public class PlaylistController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 更新歌单信息（名称/简介/标签） */
     @PutMapping("/{id}")
     public ResponseEntity<Playlist> updatePlaylist(@PathVariable String id, @RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
@@ -167,15 +154,17 @@ public class PlaylistController {
     }
 
     @PostMapping("/favorites/toggle")
-    public ResponseEntity<Map<String, Boolean>> toggleFavorite(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Boolean>> toggleFavorite(
+            @RequestBody Map<String, String> body, Authentication auth) {
         String songId = body.get("songId");
         if (songId == null) return ResponseEntity.badRequest().build();
-        boolean isFav = playlistService.toggleFavorite(songId);
+        boolean isFav = playlistService.toggleFavorite(songId, auth.getName());
         return ResponseEntity.ok(Map.of("favorite", isFav));
     }
 
     @GetMapping("/favorites/check/{songId}")
-    public ResponseEntity<Map<String, Boolean>> checkFavorite(@PathVariable String songId) {
-        return ResponseEntity.ok(Map.of("favorite", playlistService.isFavorite(songId)));
+    public ResponseEntity<Map<String, Boolean>> checkFavorite(
+            @PathVariable String songId, Authentication auth) {
+        return ResponseEntity.ok(Map.of("favorite", playlistService.isFavorite(songId, auth.getName())));
     }
 }

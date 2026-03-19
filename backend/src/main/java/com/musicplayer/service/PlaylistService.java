@@ -24,29 +24,19 @@ public class PlaylistService {
         this.playlistRepository = playlistRepository;
     }
 
-    @PostConstruct
-    public void init() {
-        // 确保"我喜欢"系统歌单存在
-        if (playlistRepository.findByIsSystemTrue().isEmpty()) {
-            Playlist favorites = new Playlist("我喜欢", true);
-            favorites.setId("favorites");
-            playlistRepository.save(favorites);
-            System.out.println("[PlaylistService] 创建系统歌单: 我喜欢");
-        }
-        System.out.println("[PlaylistService] 数据库共 " + playlistRepository.count() + " 个歌单");
-    }
 
-    public List<Playlist> getAllPlaylists() {
-        return playlistRepository.findAll();
+    public List<Playlist> getAllPlaylists(String userId) {
+        return playlistRepository.findByUserId(userId);
     }
 
     public Optional<Playlist> getPlaylist(String id) {
         return playlistRepository.findById(id);
     }
 
-    public Playlist createPlaylist(String name, String description, List<String> tags) {
+    public Playlist createPlaylist(String name, String description, List<String> tags, String userId) {
         Playlist pl = new Playlist(name, false);
         pl.setDescription(description);
+        pl.setUserId(userId);
         if (tags != null) pl.setTags(tags);
         return playlistRepository.save(pl);
     }
@@ -110,8 +100,8 @@ public class PlaylistService {
         });
     }
 
-    public boolean isFavorite(String songId) {
-        return isSongInPlaylist("favorites", songId);
+    public boolean isFavorite(String songId, String userId) {
+        return isSongInPlaylist("favorites-" + userId, songId);
     }
 
     /** 调整歌单列表顺序 */
@@ -119,12 +109,13 @@ public class PlaylistService {
         // 暂不实现排序持久化
     }
 
-    public boolean toggleFavorite(String songId) {
-        if (isFavorite(songId)) {
-            removeSong("favorites", songId);
+    public boolean toggleFavorite(String songId, String userId) {
+        String favId = "favorites-" + userId;
+        if (isFavorite(songId, userId)) {
+            removeSong(favId, songId);
             return false;
         } else {
-            addSong("favorites", songId);
+            addSong(favId, songId);
             return true;
         }
     }

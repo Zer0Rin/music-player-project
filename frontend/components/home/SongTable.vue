@@ -148,13 +148,48 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="ctxVisible" class="ctx-menu liquid-panel" :style="{ top: ctxY + 'px', left: ctxX + 'px' }" @click="ctxVisible = false">
-        <div class="ctx-item" @click="playSong(ctxSong)">播放</div>
+      <div v-if="ctxVisible" class="ctx-menu liquid-panel" :style="{ top: ctxY + 'px', left: ctxX + 'px' }" @click.stop>
+
+        <div class="ctx-item" @click="playSong(ctxSong); ctxVisible = false">播放</div>
+
         <div class="ctx-divider" />
-        <div class="ctx-item" @click="plStore.toggleFavorite(ctxSong.id)">{{ plStore.isFavorite(ctxSong.id) ? '取消喜欢' : '添加到我喜欢' }}</div>
+
+        <div
+            class="ctx-item"
+            :class="{ 'ctx-delete': plStore.isFavorite(ctxSong.id) }"
+            @click="plStore.toggleFavorite(ctxSong.id); ctxVisible = false"
+        >
+          {{ plStore.isFavorite(ctxSong.id) ? '取消喜欢' : '添加到我喜欢' }}
+        </div>
+
+        <div
+            v-if="isCustomPlaylist"
+            class="ctx-item ctx-delete"
+            @click="removeFromCurrentPlaylist(ctxSong)"
+        >
+          从此歌单中删除
+        </div>
+
         <div class="ctx-divider" v-if="plStore.userPlaylists.length" />
         <div class="ctx-label" v-if="plStore.userPlaylists.length">添加到歌单</div>
-        <div v-for="pl in plStore.userPlaylists" :key="pl.id" class="ctx-item ctx-sub" @click="plStore.addSong(pl.id, ctxSong.id)">{{ pl.name }}</div>
+
+        <div class="ctx-scroll-area custom-scrollbar" v-if="plStore.userPlaylists.length">
+          <div
+              v-for="pl in plStore.userPlaylists"
+              :key="pl.id"
+              class="ctx-item ctx-sub"
+              @click="addToPlaylist(pl, ctxSong)"
+          >
+            {{ pl.name }}
+          </div>
+        </div>
+
+        <Transition name="toast-fade">
+          <div v-if="showDuplicateToast" class="duplicate-toast">
+            {{ duplicateMsg }}
+          </div>
+        </Transition>
+
       </div>
       <div v-if="ctxVisible" class="ctx-backdrop" @click="ctxVisible = false" />
     </Teleport>
@@ -176,22 +211,72 @@ const filteredSongs = computed(() => {
   return props.songs.filter(song => song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q) || song.album.toLowerCase().includes(q))
 })
 
-function playSong(song) { const realIndex = props.songs.findIndex(s => s.id === song.id); store.playSong(song, realIndex) }
+function playSong(song) { const realIndex = props.songs.findIndex(s => s.id === song.id); store.playSong(song, realIndex); ctxVisible.value = false; }
 
 const ctxVisible = ref(false); const ctxX = ref(0); const ctxY = ref(0); const ctxSong = ref(null)
-function openMenu(e, song) { ctxSong.value = song; ctxX.value = e.clientX; ctxY.value = e.clientY; ctxVisible.value = true }
+
+// ====== 新增：处理添加到歌单（包含查重拦截） ======
+const showDuplicateToast = ref(false)
+const duplicateMsg = ref('')
+
+async function addToPlaylist(playlist, song) {
+  // 1. 查重拦截：如果歌单里已经有这首歌
+  if (playlist.songIds && playlist.songIds.includes(song.id)) {
+    duplicateMsg.value = '! 歌单内歌曲重复'
+    showDuplicateToast.value = true
+
+    // 1秒后自动隐藏提示，且【不关闭】右键菜单
+    setTimeout(() => {
+      showDuplicateToast.value = false
+    }, 1000)
+    return
+  }
+
+  // 2. 正常添加逻辑
+  try {
+    await plStore.addSong(playlist.id, song.id)
+    ctxVisible.value = false // 添加成功后关闭菜单
+  } catch (e) {
+    console.error('添加失败', e)
+  }
+}
+
+// 防止菜单跑出屏幕底部的智能定位
+function openMenu(e, song) {
+  ctxSong.value = song;
+  ctxVisible.value = true;
+  // 简单计算，防止菜单溢出屏幕下边缘
+  setTimeout(() => {
+    const menuHeight = 300; // 预估最大高度
+    ctxX.value = e.clientX;
+    ctxY.value = e.clientY + menuHeight > window.innerHeight ? window.innerHeight - menuHeight : e.clientY;
+  }, 0)
+}
+
 function formatDur(s) { const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}` }
 
 // 获取当前激活的歌单实例
 const activePlaylist = computed(() => plStore.activePlaylist)
 
+// 💡 智能判断当前是否是自定义歌单 (非系统歌单、非特殊视图)
+const isCustomPlaylist = computed(() => {
+  const id = plStore.activePlaylistId
+  return id && id !== 'recent' && id !== 'community' && id !== 'favorites'
+})
+
+// 💡 从当前歌单中移除歌曲
+const removeFromCurrentPlaylist = async (song) => {
+  if (plStore.activePlaylistId) {
+    await plStore.removeSong(plStore.activePlaylistId, song.id)
+    ctxVisible.value = false // 移除后关闭菜单
+  }
+}
+
 // 智能提取歌单封面：有自定义封面用自定义，没有则取列表第一首歌的封面
 const playlistCover = computed(() => {
-  // 1. 有自定义封面 → 用歌单封面API
   if (activePlaylist.value?.coverImage) {
     return `/api/playlists/${activePlaylist.value.id}/cover?v=${Date.now()}`
   }
-  // 2. 取第一首歌的封面
   if (filteredSongs.value && filteredSongs.value.length > 0) {
     return coverUrl(filteredSongs.value[0].id)
   }
@@ -294,13 +379,59 @@ function playAll() {
 .empty-title { font-size: 20px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.05em; }
 
 .ctx-backdrop { position: fixed; inset: 0; z-index: 9998; }
-.ctx-menu { position: fixed; z-index: 9999; border-radius: 12px; padding: 6px; min-width: 160px; }
+.ctx-menu { position: fixed; z-index: 9999; border-radius: 12px; padding: 6px; min-width: 160px; display: flex; flex-direction: column;}
 .ctx-item { padding: 10px 14px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
 .ctx-item:hover { background: rgba(255, 255, 255, 0.1); transform: translateX(2px); }
+
+/* 💡 滚动区域样式 */
+.ctx-scroll-area { max-height: 180px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;}
+.ctx-scroll-area::-webkit-scrollbar { width: 4px; }
+.ctx-scroll-area::-webkit-scrollbar-track { background: transparent; }
+.ctx-scroll-area::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+
+/* 💡 危险操作（删除）样式 */
+.ctx-delete { color: #ef4444; }
+.ctx-delete:hover { background: rgba(239, 68, 68, 0.15) !important; color: #ef4444; }
+
 .ctx-sub { padding-left: 28px; color: var(--text-secondary); }
 .ctx-sub:hover { color: var(--text-primary); }
 .ctx-label { padding: 6px 14px 4px; font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; }
-.ctx-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 10px; }
+.ctx-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 10px; flex-shrink: 0;}
+
+
+/* =========================================
+   新增：查重 Toast 悬浮提示样式
+   ========================================= */
+.duplicate-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(250, 45, 72, 0.9); /* 高对比度苹果红 */
+  color: white;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none; /* 穿透点击，绝不影响用户点其他歌单 */
+  z-index: 10000;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(250, 45, 72, 0.4);
+}
+
+/* Toast 淡入淡出及微微上浮动画 */
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -35%); /* 从略微偏下的位置弹起 */
+}
+
 
 @media (max-width: 900px) { .col-album { display: none; } .col-artist { width: 140px; } }
 @media (max-width: 768px) {

@@ -110,14 +110,12 @@ const recentActiveTab = ref('music')  // 最近
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/songs')
-    if (res.ok) {
-      allSongs.value = await res.json()
-      store.setPlaylist(allSongs.value)
-    }
+    allSongs.value = await $apiFetch('/api/songs')
+    store.setPlaylist(allSongs.value)
   } catch (err) {
     console.error('加载歌曲列表失败:', err)
   }
+
   await plStore.fetchPlaylists()
   window.addEventListener('keydown', onGlobalKey)
 })
@@ -161,7 +159,10 @@ function onGlobalKey(e) {
   }
 }
 
-
+// login
+definePageMeta({
+  middleware: 'auth'
+})
 
 </script>
 

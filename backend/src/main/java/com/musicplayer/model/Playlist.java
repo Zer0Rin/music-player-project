@@ -75,4 +75,15 @@ public class Playlist {
 
     public long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
+
+    @Column(name = "user_id")
+    private String userId;
+
+    // getter/setter
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
+
+
 }
+
+

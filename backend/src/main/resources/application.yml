@@ -5,16 +5,22 @@ music:
   data:
     path: ./music-data
 
+app:
+  jwt:
+    secret: your-256-bit-secret-key-change-this-in-production-must-be-long
+    expiration: 86400000
+  admin:
+    username: admin
+    password: admin123
+
 spring:
   servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
-
   datasource:
     url: jdbc:sqlite:./music-data/musicplayer.db
     driver-class-name: org.sqlite.JDBC
-
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
     hibernate:
@@ -23,3 +29,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+
+#debug: true
