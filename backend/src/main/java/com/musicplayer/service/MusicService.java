@@ -243,4 +243,42 @@ public class MusicService {
     public Path getAudioPath(String fileName) { return Paths.get(musicDataPath, "audio", fileName); }
     public Path getLyricsPath(String fileName) { return Paths.get(musicDataPath, "lyrics", fileName); }
     public Path getCoverPath(String fileName) { return Paths.get(musicDataPath, "covers", fileName); }
+
+
+    /** 暴露 audio 目录路径 */
+    public String getAudioDir() {
+        return Paths.get(musicDataPath, "audio").toString();
+    }
+
+    /** 公开扫描方法，上传后调用 */
+    public void scanMusic() {
+        scanMusicFiles();
+    }
+
+    /** 删除歌曲及其关联文件 */
+    public void deleteSong(String id) {
+        songRepository.findById(id).ifPresent(song -> {
+            try { Files.deleteIfExists(Paths.get(musicDataPath, "audio", song.getAudioFile())); } catch (Exception ignored) {}
+            if (song.getCoverFile() != null) {
+                try { Files.deleteIfExists(Paths.get(musicDataPath, "covers", song.getCoverFile())); } catch (Exception ignored) {}
+            }
+            if (song.getLyricsFile() != null) {
+                try { Files.deleteIfExists(Paths.get(musicDataPath, "lyrics", song.getLyricsFile())); } catch (Exception ignored) {}
+            }
+            songRepository.delete(song);
+            System.out.println("[MusicService] 已删除歌曲: " + song.getTitle());
+        });
+    }
+
+
+    /** admin 管理 */
+    public Path getCoverDir() {
+        return Paths.get(musicDataPath, "covers");
+    }
+
+    public Path getLyricsDir() {
+        return Paths.get(musicDataPath, "lyrics");
+    }
+
+
 }

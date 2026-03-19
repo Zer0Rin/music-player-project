@@ -11,6 +11,13 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.ArrayList;
+import java.util.Map;
+
+
+
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
@@ -115,5 +122,106 @@ public class SongController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** 上传音频文件（仅 ADMIN） */
+    @PostMapping("/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadSongs(@RequestParam("files") MultipartFile[] files) {
+        List<Map<String, String>> results = new ArrayList<>();
+        for (MultipartFile file : files) {
+            String filename = file.getOriginalFilename();
+            try {
+                if (!isAudioFile(filename)) {
+                    results.add(Map.of("file", filename, "status", "error", "message", "不支持的格式"));
+                    continue;
+                }
+                Path dest = Paths.get(musicService.getAudioDir(), filename);
+                file.transferTo(dest);
+                results.add(Map.of("file", filename, "status", "ok"));
+            } catch (Exception e) {
+                results.add(Map.of("file", filename, "status", "error", "message", e.getMessage()));
+            }
+        }
+        musicService.scanMusic();
+        return ResponseEntity.ok(Map.of("results", results));
+    }
+
+    /** 删除歌曲（仅 ADMIN） */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteSong(@PathVariable String id) {
+        musicService.deleteSong(id);
+        return ResponseEntity.ok().build();
+    }
+
+    private boolean isAudioFile(String filename) {
+        if (filename == null) return false;
+        String lower = filename.toLowerCase();
+        return lower.endsWith(".mp3") || lower.endsWith(".flac") ||
+                lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".m4a");
+    }
+
+
+    /** 修改歌曲信息（仅 ADMIN） */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateSong(@PathVariable String id,
+                                        @RequestBody Map<String, String> body) {
+        return musicService.getSongById(id).map(song -> {
+            if (body.containsKey("title")) song.setTitle(body.get("title"));
+            if (body.containsKey("artist")) song.setArtist(body.get("artist"));
+            if (body.containsKey("album")) song.setAlbum(body.get("album"));
+            if (body.containsKey("genre")) song.setGenre(body.get("genre"));
+            if (body.containsKey("year")) song.setYear(body.get("year"));
+            return ResponseEntity.ok(musicService.saveSong(song));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /** 替换封面图片（仅 ADMIN） */
+    @PostMapping("/{id}/cover/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadCover(@PathVariable String id,
+                                         @RequestParam("file") MultipartFile file) {
+        return musicService.getSongById(id).map(song -> {
+            try {
+                Path coverDir = musicService.getCoverDir();
+                Files.createDirectories(coverDir);
+                String ext = file.getOriginalFilename() != null &&
+                        file.getOriginalFilename().contains(".")
+                        ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.'))
+                        : ".jpg";
+                String baseName = song.getAudioFile().substring(0, song.getAudioFile().lastIndexOf('.'));
+                String filename = baseName + ext;
+                file.transferTo(coverDir.resolve(filename));
+                song.setCoverFile(filename);
+                musicService.saveSong(song);
+                return ResponseEntity.ok(Map.of("coverFile", filename));
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
+            }
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /** 替换歌词文件（仅 ADMIN） */
+    @PostMapping("/{id}/lyrics/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadLyrics(@PathVariable String id,
+                                          @RequestParam("file") MultipartFile file) {
+        return musicService.getSongById(id).map(song -> {
+            try {
+                Path lyricsDir = musicService.getLyricsDir();
+                Files.createDirectories(lyricsDir);
+                String baseName = song.getAudioFile().substring(0, song.getAudioFile().lastIndexOf('.'));
+                String filename = baseName + ".lrc";
+                file.transferTo(lyricsDir.resolve(filename));
+                song.setLyricsFile(filename);
+                musicService.saveSong(song);
+                return ResponseEntity.ok(Map.of("lyricsFile", filename));
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
+            }
+        }).orElse(ResponseEntity.notFound().build());
+    }
 
 }
+
+

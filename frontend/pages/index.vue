@@ -25,7 +25,7 @@
         </button>
 
         <SongTable
-            v-if="plStore.activePlaylistId !== 'recent' && plStore.activePlaylistId !== 'community'"
+            v-if="plStore.activePlaylistId !== 'recent' && plStore.activePlaylistId !== 'community' && plStore.activePlaylistId !== 'profile'"
             :songs="displaySongs"
             :page-title="pageTitle"
             :layout-mode="layoutMode"
@@ -57,6 +57,10 @@
 
         <div v-else-if="plStore.activePlaylistId === 'community'" class="community-wrapper" style="height: 100%; width: 100%; overflow: hidden;">
           <CommunityView @toggle-modal="onCommunityModalToggle" />
+        </div>
+
+        <div v-else-if="plStore.activePlaylistId === 'profile'" class="profile-wrapper" style="height: 100%; overflow-y: auto;">
+          <ProfileView />
         </div>
 
       </div>
@@ -92,12 +96,13 @@ import LyricView from '~/components/player/LyricView.vue'
 import CreatePlaylistModal from '~/components/playlist/CreatePlaylistModal.vue'
 import EditPlaylistModal from '~/components/playlist/EditPlaylistModal.vue'
 import CommunityView from '~/components/community/CommunityView.vue'
+import ProfileView from '~/components/user/ProfileView.vue'
 
 const store = usePlayerStore()
 const plStore = usePlaylistStore()
 const { seek, setVolume } = useAudioPlayer()
 
-const allSongs = ref([])
+const allSongs = computed(() => store.allSongs)
 const showCreateModal = ref(false)
 const sidebarOpen = ref(false)
 const showEditModal = ref(false)
@@ -110,8 +115,8 @@ const recentActiveTab = ref('music')  // 最近
 
 onMounted(async () => {
   try {
-    allSongs.value = await $apiFetch('/api/songs')
-    store.setPlaylist(allSongs.value)
+    const { $apiFetch } = useNuxtApp()
+    await store.refreshSongs($apiFetch)
   } catch (err) {
     console.error('加载歌曲列表失败:', err)
   }

@@ -53,6 +53,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/songs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/songs/**").hasRole("ADMIN")
 
+                        //修改密码
+                        .requestMatchers(HttpMethod.PUT, "/api/songs/**").hasRole("ADMIN")
+
                         // 歌单相关需要登录
                         .requestMatchers("/api/playlists/**").authenticated()
                         // 用户自己的信息

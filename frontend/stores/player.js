@@ -2,21 +2,24 @@ import { defineStore } from 'pinia'
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
-    playlist: [],
-    currentSong: null,
-    currentIndex: -1,
-    playOrder: [],
-    orderCursor: -1,
-    isPlaying: false,
-    currentTime: 0,
-    duration: 0,
-    lyricsText: '',
-    parsedLyrics: [],
-    volume: 0.8,
-    playMode: 'sequence',
-    lyricMode: 'line',
-    showLyricView: false,
-    recentSongs: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : [],// 为了搭建 ”最近“板块 新增：最近播放列表（安全读取本地存储）
+      playlist: [],
+      currentSong: null,
+      currentIndex: -1,
+      playOrder: [],
+      orderCursor: -1,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      lyricsText: '',
+      parsedLyrics: [],
+      volume: 0.8,
+      playMode: 'sequence',
+      lyricMode: 'line',
+      showLyricView: false,
+      recentSongs: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : [],// 为了搭建 ”最近“板块 新增：最近播放列表（安全读取本地存储）
+      allSongs: [],
+
+
   }),
 
   getters: {
@@ -182,6 +185,13 @@ export const usePlayerStore = defineStore('player', {
     toggleLyricMode() {
           this.lyricMode = this.lyricMode === 'word' ? 'line' : 'word'
       },
+
+      async refreshSongs(apiFetch) {
+          const songs = await apiFetch('/api/songs')
+          this.allSongs = songs
+          this.setPlaylist(songs)
+      },
+
 
 
   },

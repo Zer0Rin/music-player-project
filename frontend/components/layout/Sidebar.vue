@@ -66,9 +66,18 @@
         </div>
       </div>
 
-      <a v-for="pl in plStore.userPlaylists" :key="pl.id" class="nav-item pl-item" :class="{ active: plStore.activePlaylistId === pl.id }" @click.prevent="navTo(pl.id)" @contextmenu.prevent="openPlMenu($event, pl)">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-        <span class="pl-name">{{ pl.name }}</span>
+
+      <a v-for="pl in plStore.userPlaylists" :key="pl.id"
+         class="nav-item pl-item"
+         :class="{ active: plStore.activePlaylistId === pl.id }"
+         @click.prevent="navTo(pl.id)"
+         @contextmenu.prevent="openPlMenu($event, pl)">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+        </svg>
+        <div class="pl-info">
+          <span class="pl-name">{{ pl.name }}</span>
+        </div>
         <span class="nav-badge" v-if="pl.songIds.length">{{ pl.songIds.length }}</span>
       </a>
 
@@ -84,13 +93,39 @@
       </div>
       <div v-if="menuVisible" class="ctx-backdrop" @click="menuVisible = false" />
     </Teleport>
+
+    <!-- 用户信息区 -->
+    <div class="user-section liquid-card" @click="goProfile">
+      <div class="user-avatar">
+        <img v-if="avatarUrl" :src="avatarUrl" class="avatar-img" />
+        <div v-else class="avatar-placeholder">{{ authStore.user?.nickname?.[0] || 'U' }}</div>
+      </div>
+      <div class="user-info">
+        <div class="user-nickname">{{ authStore.user?.nickname || authStore.user?.username }}</div>
+        <div class="user-role">{{ authStore.user?.role === 'ADMIN' ? '管理员' : '普通用户' }}</div>
+      </div>
+      <button class="logout-btn" @click.stop="authStore.logout()" title="退出登录">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+        </svg>
+      </button>
+    </div>
+
   </aside>
 </template>
 
 <script setup>
 const plStore = usePlaylistStore()
+const authStore = useAuthStore()
 const props = defineProps({ open: Boolean })
 const emit = defineEmits(['close', 'openCreateModal'])
+
+const avatarUrl = computed(() => {
+  if (authStore.user?.avatarFile) {
+    return `/api/user/avatar/${authStore.user.avatarFile}?v=${Date.now()}`
+  }
+  return null
+})
 
 const isDark = ref(true)
 function setTheme(mode) {
@@ -130,6 +165,14 @@ const menuTarget = ref(null)
 function openPlMenu(e, pl) { menuTarget.value = pl; menuX.value = e.clientX; menuY.value = e.clientY; menuVisible.value = true }
 function startRename() { const pl = menuTarget.value; if (!pl) return; const name = prompt('重命名歌单', pl.name); if (name?.trim()) plStore.renamePlaylist(pl.id, name.trim()) }
 function deletePl() { const pl = menuTarget.value; if (!pl) return; if (confirm(`确定删除歌单「${pl.name}」吗？`)) plStore.deletePlaylist(pl.id) }
+
+function goProfile() {
+  plStore.activePlaylistId = 'profile'
+  setTimeout(() => emit('close'), 200)
+}
+
+
+
 </script>
 
 <style scoped>
@@ -200,6 +243,12 @@ function deletePl() { const pl = menuTarget.value; if (!pl) return; if (confirm(
   border-color: rgba(255,255,255,0.05);
 }
 
+/* 白天模式下的悬浮状态适配 */
+.light-mode .nav-item:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.05); /* 和底部用户区同款的高级灰 */
+  border-color: rgba(0, 0, 0, 0.05); /* 边框也同步变暗 */
+  color: #111; /* 确保悬浮时文字足够深 */
+}
 
 /* 核心灵魂：Liquid UI 动态流体高亮态 */
 .nav-item.active {
@@ -305,7 +354,69 @@ function deletePl() { const pl = menuTarget.value; if (!pl) return; if (confirm(
 .ctx-danger:hover { background: rgba(255, 77, 79, 0.15); }
 
 @media (max-width: 768px) {
-  .sidebar { position: fixed; top: 0; left: 0; width: 280px; z-index: 50; transform: translateX(-110%); transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5); }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    /* 给侧边栏底部增加安全距离（假设你的播放栏高度约为 80px） */
+    padding-bottom: 90px;
+    /* 确保 padding 包含在整体高度内，不会导致内容溢出 */
+    box-sizing: border-box;
+
+    z-index: 50;
+    transform: translateX(-110%);
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
+  }
   .sidebar.sidebar-open { transform: translateX(0); }
 }
+
+/* 用户 相关 */
+.user-section {
+  margin: 8px 16px 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.user-section:hover { background: rgba(255,255,255,0.08); }
+
+.user-avatar { flex-shrink: 0; }
+.avatar-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.avatar-placeholder {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(139,92,246,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 600; color: white;
+}
+
+.user-info { flex: 1; min-width: 0; }
+.user-nickname { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-role { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+
+.logout-btn {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 8px; border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.logout-btn:hover { background: rgba(255,77,79,0.15); color: #ff4d4f; }
+
+.pl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+
+</style>
+
+
+<style>
+.light-mode .user-section:hover { background: rgba(0,0,0,0.04); }
+.light-mode .logout-btn:hover { background: rgba(255,77,79,0.1); }
 </style>
