@@ -319,12 +319,42 @@ function playAll() {
 
 /* 分配列宽与对齐方式，确保表头和内容严丝合缝 */
 .col-index { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;position: relative; }
-.col-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; }
+.col-title {
+  flex: 4; /* 分配 4 份空间，绝对优先保卫歌名 */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-right: 16px; /* 防止和右边列贴得太近 */
+}
 
 /* 艺术家和专辑左对齐 */
-.col-artist { width: 180px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; font-size: 14px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.col-album { width: 200px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; font-size: 14px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-artist {
+  flex: 2; /* 分配 2 份空间 */
+  min-width: 0; /* 💡 关键：允许它被挤压折叠，不再是钉子户 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 14px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 16px;
+}
 
+.col-album {
+  flex: 2; /* 分配 2 份空间 */
+  min-width: 0; /* 💡 关键：允许它被挤压折叠 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* 喜欢按钮居中对齐，稍微加宽一点以匹配表头文字 */
 .col-fav { width: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
@@ -433,7 +463,22 @@ function playAll() {
 }
 
 
-@media (max-width: 900px) { .col-album { display: none; } .col-artist { width: 140px; } }
+/* =========================================
+   响应式折叠逻辑
+   ========================================= */
+
+/* 第一阶段 (< 1024px)：屏幕变窄时，优先隐藏专辑 */
+@media (max-width: 1024px) {
+  .col-album { display: none; }
+  .page-header.list-header {
+    flex-wrap: wrap; /* 允许挤不下的元素换行 */
+  }
+}
+
+/* 第二阶段 (< 900px)：平板尺寸时，隐藏艺术家，誓死保卫"歌名"的完整显示 */
+@media (max-width: 900px) {
+  .col-artist { display: none; }
+}
 @media (max-width: 768px) {
   .page-header { padding: 20px 16px 16px; padding-left: 64px; flex-wrap: wrap; }
   .gradient-text { font-size: 24px; }

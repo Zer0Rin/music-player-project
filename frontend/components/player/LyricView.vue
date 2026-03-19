@@ -31,7 +31,12 @@
             </Transition>
           </div>
 
-          <AudioVisualizer :width="420" :height="56" class="visualizer" />
+          <AudioVisualizer
+            :width="420"
+            :height="56"
+            class="visualizer"
+            v-show="!isMobile || !isFlipped"
+        />
 
           <div class="bottom-controls-wrap">
             <div class="track-info" v-if="store.currentSong">
@@ -201,11 +206,43 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
 .close-btn { position: absolute; top: 20px; left: 24px; z-index: 50; background: transparent; border: none; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-fast); }
 .close-btn:hover { color: #fff; transform: translateY(4px); }
 
-.lyric-content { position: relative; z-index: 1; height: 100%; display: flex; padding: 40px 0; }
+/* 加上 box-sizing: border-box，确保 100% 高度包含了 padding，绝不溢出 */
+.lyric-content {
+  box-sizing: border-box; /* 极度重要！ */
+  position: relative;
+  z-index: 1;
+  height: 100%; /* 保持 100% 全屏 */
+  display: flex;
+  padding: 40px 0; /* PC 默认 padding 保持不动 */
+  overflow: hidden; /* 我们争取不产生内部滚动，通过动态缩小封面解决 */
+}
 
 /* PC端左侧布局 */
-.left-panel { margin-left: 10%; width: 30%; min-width: 0; overflow: hidden; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; position: relative; }
-.interactive-area { width: min(420px, 95%); aspect-ratio: 1 / 1; position: relative; flex-shrink: 0; cursor: pointer; }
+.left-panel {
+  margin-left: 10%;
+  width: 30%;
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* 改为顶部对齐 */
+  padding-top: 2vh; /* 顶部预留一点点呼吸空间 */
+  box-sizing: border-box; /* 确保 padding 在内部 */
+  height: 100%; /* 确保填满父容器被压缩后的高度 */
+  gap: 0; /* 我们将通过 margin 精准控制空间瓜分 */
+  position: relative;
+}
+.interactive-area {
+  width: min(420px, 95%, 38vh); /* Ruler 变得更聪明，永远比控制台小 */
+  aspect-ratio: 1 / 1;
+  position: relative;
+  flex-shrink: 0; /* 不允许被压缩变形 */
+  cursor: pointer;
+  /* auto 会将下面的组件全家，无情推到 `.left-panel` 的最底部。实现完美的 Apple Music 上下分布手感。 */
+  margin-bottom: auto;
+}
 .cover-container {
   position: absolute;  /* 关键：剥夺它撑开父容器的权利 */
   inset: 0;            /* 相当于 top:0; bottom:0; left:0; right:0; 完美填满 */
@@ -220,7 +257,14 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
   object-fit: cover !important;
   display: block;
 }
-.bottom-controls-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.bottom-controls-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 缩小全局间距从 18px 到 12px。寸土寸金！ */
+  gap: 12px;
+}
 .track-info { text-align: center; width: min(420px, 95%); padding: 4px 0 0; }
 .track-title { font-size: 27px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .track-artist { font-size: 21px; color: rgba(255, 255, 255, 0.5); margin-top: 5px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
@@ -265,38 +309,49 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
    📱 移动端沉浸式单列布局 (Apple Music 风格)
    ========================================= */
 @media (max-width: 768px) {
-  /* 调整整体容器边距，顶部留给返回按钮，底部顶满 */
+
+  /* 💡 修复1：加上 box-sizing，并且必须使用 dvh 避免浏览器地址栏干扰 */
   .lyric-content {
-    padding: 60px 24px 32px;
+    box-sizing: border-box; /* 极度重要！确保 padding 不会撑破高度 */
+    padding: 50px 24px 24px; /* 稍微压缩上下留白，给底部让路 */
     flex-direction: column;
     align-items: center;
-    justify-content: space-between; /* 上下分布 */
-    height: 100vh;
+    justify-content: space-between;
+    height: 100dvh;
+    overflow: hidden; /* 严禁出现整体滚动条 */
   }
 
-  /* 左面板变为撑满屏幕的主体 */
-  .left-panel { margin-left: 0; width: 100%; height: 100%; flex: 1; gap: 0; justify-content: flex-start; }
+  .left-panel {
+    margin-left: 0;
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    gap: 0;
+    justify-content: flex-start;
+    display: flex;
+    flex-direction: column;
+  }
 
-  /* 交互区（封面/歌词容器）：占据上半部分主要空间 */
+  /* 取消写死的 55vh，让它具有弹性 */
   .interactive-area {
     width: 100%;
-    height: 55vh; /* 高度动态适配屏幕 */
-    aspect-ratio: auto;
+    flex: 1; /* 占据屏幕中部的所有剩余空间 */
+    min-height: 0; /* 允许它被压缩，这句很关键 */
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 24px;
+    margin-bottom: 16px; /* 压缩底部间距 */
   }
 
-  /* 移动端封面：方正、巨大、带大圆角 */
+  /* 移动端封面：保持你完美的大圆角方块 */
   .cover-container {
-    width: min(85vw, 360px);
+    width: min(85vw, 45dvh, 360px);
     aspect-ratio: 1;
     border-radius: 12px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    margin: 0 auto;
   }
 
-  /* 移动端歌词容器 */
   .mobile-lyrics-container {
     width: 100%;
     height: 100%;
@@ -305,33 +360,80 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
   }
 
-  /* 底部控制台：挤在屏幕下半部分 */
+  /* 底部控制台保持在屏幕内 */
   .bottom-controls-wrap {
     width: 100%;
-    gap: 16px;
-    margin-top: auto; /* 自动推到底部 */
+    gap: 12px; /* 缩小元素之间的空隙 */
+    margin-top: auto;
+    flex-shrink: 0; /* 绝对不能被压缩 */
   }
 
   /* 左对齐的歌曲信息 */
   .track-info {
     width: 100%;
-    text-align: left; /* Apple Music 风格左对齐 */
-    padding-left: 8px;
+    text-align: left;
+    padding: 0; /* 去掉多余的 padding */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
-  .track-title { font-size: 24px; }
-  .track-artist { font-size: 18px; margin-top: 2px; }
 
-  /* 各种进度条宽度撑满 */
+  .track-title {
+    font-size: 22px; /* 稍微缩小一点字号，更加精致 */
+    font-weight: 700;
+    line-height: 1.2;
+    padding-right: 40px; /* 给右边的爱心留出空间，防止歌名太长盖住爱心 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .track-artist {
+    font-size: 16px;
+    margin-top: 2px;
+    line-height: 1.2;
+    opacity: 0.8;
+  }
+
+  /* 修正爱心按钮的垂直居中 */
+  .track-fav-btn {
+    position: absolute;
+    right: 0;
+    top: 50%; /* 垂直居中 */
+    transform: translateY(-50%);
+  }
+  /* 修复 hover 时的 transform 覆盖问题 */
+  .track-fav-btn:hover {
+    transform: translateY(-50%) scale(1.15);
+  }
+
   .progress-area, .controls-row, .volume-row { width: 100%; max-width: none; }
 
-  /* 按钮尺寸微调 */
-  .play-btn { width: 64px; height: 64px; }
-  .ctrl-main { gap: 32px; }
+  /* 按钮尺寸微调：为了保住底部，稍微缩小播放器按钮 */
+  .play-btn { width: 56px; height: 56px; }
+  .ctrl-main { gap: 24px; }
 
-  /* 隐藏频谱（移动端空间宝贵） */
-  .visualizer { display: none; }
+  .visualizer {
+    display: flex; /* 解除隐藏，允许显示 */
+    align-items: center;
+    justify-content: center;
+    width: 100%;
 
-  /* 顶部下拉按钮改为横杠样式 */
+    /* 核心限制：给一个固定的矮高度，绝不挤压底部控制台 */
+    height: 36px;
+    margin: 8px 0 16px; /* 调整上下间距，与上方封面和下方文字保持呼吸感 */
+
+    flex-shrink: 0; /* 绝对不被压缩，保持波浪的完整性 */
+    opacity: 0.8; /* 稍微透明一点，作为高级点缀 */
+  }
+
+  /* 如果需要强制波浪柱里的 Canvas 适配手机宽度 */
+  .visualizer :deep(canvas) {
+    max-width: 80%; /* 避免波浪太宽顶到屏幕边缘 */
+    height: 100% !important; /* 强制填满我们设定的 36px 高度 */
+  }
+
   .close-btn {
     top: 12px;
     left: 50%;
@@ -341,7 +443,7 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
     background: transparent;
     backdrop-filter: none;
   }
-  .close-btn svg { display: none; } /* 隐藏原来的 SVG */
+  .close-btn svg { display: none; }
   .close-btn::after {
     content: '';
     display: block;
@@ -352,39 +454,9 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
   }
 }
 
-.track-info {
-  text-align: center;
-  width: min(420px, 95%);
-  padding: 4px 0 0;
-  position: relative;
-}
-
-/* 爱心绝对定位在右侧 */
-.track-fav-btn {
-  position: absolute;
-  right: -10px;
-  top: 6px;
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.track-fav-btn:hover {
-  color: rgba(255, 255, 255, 0.7);
-  transform: scale(1.15);
-}
-
-.track-fav-btn.fav-active {
-  color: var(--accent);
-  filter: drop-shadow(0 0 8px rgba(250, 45, 72, 0.5));
-}
-
+/* =========================================
+   全局通用的爱心按钮样式 (放在媒体查询外部)
+   ========================================= */
 .track-fav-btn {
   background: none;
   border: none;
@@ -396,11 +468,16 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
   align-items: center;
   flex-shrink: 0;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* 绝对定位，把❤强行“钉”在容器的最右侧垂直居中位置 */
+  position: absolute;
+  right: 0;           /* 靠最右 */
+  top: 70%;           /* 距离顶部 50% */
+  transform: translateY(-50%); /* 完美垂直居中修正 */
 }
 
 .track-fav-btn:hover {
   color: rgba(255, 255, 255, 0.7);
-  transform: scale(1.15);
+  transform: translateY(-50%) scale(1.15);
 }
 
 .track-fav-btn.fav-active {
