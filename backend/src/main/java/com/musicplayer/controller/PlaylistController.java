@@ -13,16 +13,21 @@ import java.nio.file.*;
 import java.util.List;
 import java.util.Map;
 
+import com.musicplayer.service.UserService;
+
 @RestController
 @RequestMapping("/api/playlists")
 public class PlaylistController {
 
     private final PlaylistService playlistService;
+    private final UserService userService;
     private static final long MAX_COVER_SIZE = 7 * 1024 * 1024;
 
-    public PlaylistController(PlaylistService playlistService) {
+    public PlaylistController(PlaylistService playlistService, UserService userService) {
         this.playlistService = playlistService;
+        this.userService = userService;
     }
+
 
     @GetMapping
     public List<Playlist> listPlaylists(Authentication auth) {
@@ -167,4 +172,44 @@ public class PlaylistController {
             @PathVariable String songId, Authentication auth) {
         return ResponseEntity.ok(Map.of("favorite", playlistService.isFavorite(songId, auth.getName())));
     }
+
+
+    /** 推荐码相关 */
+    /** 生成推荐码 */
+    @PostMapping("/{id}/share")
+    public ResponseEntity<?> generateShare(@PathVariable String id, Authentication auth) {
+        try {
+            // 获取用户名
+            String username = userService.findById(auth.getName()).getUsername();
+            Playlist pl = playlistService.generateShareCode(id, username);
+            return ResponseEntity.ok(Map.of(
+                    "shareCode", pl.getShareCode(),
+                    "expiry", pl.getShareCodeExpiry()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** 预览推荐码歌单 */
+    @GetMapping("/share/preview/{code}")
+    public ResponseEntity<?> previewShare(@PathVariable String code) {
+        try {
+            return ResponseEntity.ok(playlistService.previewShareCode(code));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** 导入推荐码歌单 */
+    @PostMapping("/share/import/{code}")
+    public ResponseEntity<?> importShare(@PathVariable String code, Authentication auth) {
+        try {
+            Playlist pl = playlistService.importByShareCode(code, auth.getName());
+            return ResponseEntity.ok(pl);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
 }

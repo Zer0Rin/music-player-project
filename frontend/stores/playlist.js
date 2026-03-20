@@ -188,5 +188,25 @@ export const usePlaylistStore = defineStore('playlist', {
         setActivePlaylist(id) {
             this.activePlaylistId = id
         },
+
+        /** 生成推荐码 */
+        async generateShareCode(playlistId) {
+            const { $apiFetch } = useNuxtApp()
+            return await $apiFetch(`/api/playlists/${playlistId}/share`, { method: 'POST' })
+        },
+
+        /** 预览推荐码 */
+        async previewShareCode(code) {
+            const { $apiFetch } = useNuxtApp()
+            return await $apiFetch(`/api/playlists/share/preview/${code}`)
+        },
+
+        /** 导入推荐码歌单 */
+        async importByShareCode(code) {
+            const { $apiFetch } = useNuxtApp()
+            const pl = await $apiFetch(`/api/playlists/share/import/${code}`, { method: 'POST' })
+            this.playlists.push(pl)
+            return pl
+        },
     },
 })

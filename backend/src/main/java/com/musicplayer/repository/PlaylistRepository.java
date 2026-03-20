@@ -9,4 +9,8 @@ public interface PlaylistRepository extends JpaRepository<Playlist, String> {
     List<Playlist> findByUserId(String userId);
     Optional<Playlist> findByIsSystemTrueAndUserId(String userId);
     //List<Playlist> findByIsSystemTrue();
+
+    //推荐码
+    Optional<Playlist> findByShareCode(String shareCode);
+
 }

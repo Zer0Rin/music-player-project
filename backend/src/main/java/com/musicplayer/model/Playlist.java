@@ -83,7 +83,14 @@ public class Playlist {
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
 
-
+    //歌单推荐码
+    private String shareCode;        // 推荐码
+    private Long shareCodeExpiry;    // 过期时间戳（毫秒）
+    //推荐码功能
+    public String getShareCode() { return shareCode; }
+    public void setShareCode(String shareCode) { this.shareCode = shareCode; }
+    public Long getShareCodeExpiry() { return shareCodeExpiry; }
+    public void setShareCodeExpiry(Long shareCodeExpiry) { this.shareCodeExpiry = shareCodeExpiry; }
 }
 
 

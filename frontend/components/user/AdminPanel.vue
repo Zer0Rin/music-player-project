@@ -74,6 +74,16 @@
 
             <!-- 歌曲列表 -->
             <div class="song-list-panel" v-show="activeTab === 'songs'">
+
+              <!-- 搜索栏 -->
+              <div class="admin-search-bar">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="search-icon">
+                  <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+                <input v-model="searchQuery" type="text" placeholder="搜索歌曲标题、艺术家或专辑..." class="admin-search-input" />
+                <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''">×</button>
+              </div>
+
               <div class="list-header">
                 <span class="col-num">#</span>
                 <span class="col-cover" />
@@ -84,7 +94,7 @@
                 <span class="col-actions" />
               </div>
               <div class="list-body">
-                <div v-for="(song, i) in songs" :key="song.id"
+                <div v-for="(song, i) in filteredAndSortedSongs" :key="song.id"
                      class="song-row"
                      :class="{ selected: selectedSong?.id === song.id }"
                      @click="selectSong(song)">
@@ -106,6 +116,10 @@
                       </svg>
                     </button>
                   </div>
+                </div>
+
+                <div v-if="!filteredAndSortedSongs.length" class="admin-empty-state">
+                  未找到相关歌曲
                 </div>
               </div>
             </div>
@@ -221,10 +235,37 @@ const props = defineProps({ visible: Boolean })
 const emit = defineEmits(['close', 'uploaded'])
 const { $apiFetch } = useNuxtApp()
 
+//搜索歌曲
 const activeTab = ref('songs')
 const songs = ref([])
 const selectedSong = ref(null)
 const coverTs = ref(Date.now())
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算属性（同时处理过滤和默认排序）
+const filteredAndSortedSongs = computed(() => {
+  let result = songs.value
+
+  // 1. 搜索过滤
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    result = result.filter(song =>
+        (song.title && song.title.toLowerCase().includes(q)) ||
+        (song.artist && song.artist.toLowerCase().includes(q)) ||
+        (song.album && song.album.toLowerCase().includes(q))
+    )
+  }
+
+  // 2. 默认排序：按标题数字、字母、中文拼音顺序（升序）
+  return result.slice().sort((a, b) => {
+    const titleA = a.title || ''
+    const titleB = b.title || ''
+    // localeCompare 是处理字符串排序的神器，{ numeric: true } 能让 "2" 排在 "10" 前面
+    return titleA.localeCompare(titleB, 'zh-CN', { numeric: true })
+  })
+})
 
 // 编辑表单
 const editForm = reactive({ title: '', artist: '', album: '', genre: '', year: '' })
@@ -246,6 +287,10 @@ const fileInput = ref(null)
 const progress = computed(() =>
     pendingFiles.value.length ? Math.round(uploadedCount.value / pendingFiles.value.length * 100) : 0
 )
+
+
+
+
 
 // 加载歌曲列表
 async function loadSongs() {
@@ -491,7 +536,7 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
 .detail-header { display: flex; align-items: center; justify-content: space-between; }
 .detail-header h3 { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .close-detail-btn { background: none; border: none; color: var(--text-tertiary); cursor: pointer; display: flex; }
-.detail-cover { width: 100%; aspect-ratio: 1; border-radius: 12px; overflow: hidden; }
+.detail-cover { width: 100%; aspect-ratio: 1; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: rgba(0, 0, 0, 0.2);}
 .detail-cover-img { width: 100%; height: 100%; object-fit: cover; }
 .detail-cover-placeholder { width: 100%; height: 100%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 48px; }
 
@@ -546,5 +591,43 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
 .audio-preview { width: 100%; }
 .native-player { width: 100%; height: 36px; border-radius: 8px; }
 
+
+/* 搜索栏样式 */
+.admin-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.15); /* 稍微深一点的底色区分区域 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.search-icon { color: var(--text-tertiary); flex-shrink: 0; }
+.admin-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+.admin-search-input::placeholder { color: var(--text-tertiary); }
+.clear-search-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+.clear-search-btn:hover { color: var(--text-primary); }
+
+.admin-empty-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
 
 </style>

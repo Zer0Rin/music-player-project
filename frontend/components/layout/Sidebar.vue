@@ -58,7 +58,7 @@
               <div class="add-dropdown-item" @click="openCreateModal">
                 创建歌单
               </div>
-              <div class="add-dropdown-item disabled">
+              <div class="add-dropdown-item" @click="openImportModal">
                 导入歌单
               </div>
             </div>
@@ -110,6 +110,8 @@
         </svg>
       </button>
     </div>
+
+    <ShareCodeModal :visible="showImport" :playlist-id="null" @close="showImport = false" />
 
   </aside>
 </template>
@@ -171,6 +173,14 @@ function goProfile() {
   setTimeout(() => emit('close'), 200)
 }
 
+// 分享码   +  导入
+import ShareCodeModal from '~/components/playlist/ShareCodeModal.vue'
+const showImport = ref(false)
+
+function openImportModal() {
+  addMenuOpen.value = false
+  showImport.value = true
+}
 
 
 </script>
@@ -411,6 +421,8 @@ function goProfile() {
 .logout-btn:hover { background: rgba(255,77,79,0.15); color: #ff4d4f; }
 
 .pl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+
 
 
 </style>

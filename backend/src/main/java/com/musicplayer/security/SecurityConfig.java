@@ -29,16 +29,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 💡 关键修复 1：必须通知 Spring Security 启用 CORS 跨域支持！
+                // 关键修复 1：必须通知 Spring Security 启用 CORS 跨域支持！
                 .cors(org.springframework.security.config.Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 💡 关键修复 2：无条件放行所有跨域的 OPTIONS 预检请求！
+                        // 关键修复 2：无条件放行所有跨域的 OPTIONS 预检请求！
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // 登录注册放行
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        //分享码
+                        .requestMatchers("/api/playlists/share/preview/**").permitAll()
 
                         // 音频/封面/歌词 (建议用 ** 代替 *，防止 ID 里有特殊字符导致匹配失败)
                         .requestMatchers("/api/songs/*/audio").permitAll()

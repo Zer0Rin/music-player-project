@@ -148,4 +148,60 @@ public class PlaylistService {
     public Path getCoverImagePath(String fileName) {
         return Paths.get(musicDataPath, "playlist-covers", fileName);
     }
+
+
+    /** 推荐码相关 */
+    /** 生成推荐码 */
+    public Playlist generateShareCode(String playlistId, String username) {
+        Playlist pl = playlistRepository.findById(playlistId).orElseThrow();
+        // 生成 6 位大写字母+数字
+        String random = java.util.UUID.randomUUID().toString()
+                .replaceAll("[^A-Z0-9]", "").substring(0, 6);
+        String code = username.toUpperCase() + "-" + random;
+        pl.setShareCode(code);
+        pl.setShareCodeExpiry(System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000);
+        return playlistRepository.save(pl);
+    }
+
+    /** 通过推荐码导入歌单 */
+    public Playlist importByShareCode(String code, String targetUserId) {
+        Playlist source = playlistRepository.findByShareCode(code)
+                .orElseThrow(() -> new RuntimeException("推荐码不存在"));
+
+        // 检查有效期
+        if (source.getShareCodeExpiry() == null ||
+                System.currentTimeMillis() > source.getShareCodeExpiry()) {
+            throw new RuntimeException("推荐码已过期");
+        }
+
+        // 不能导入自己的歌单
+        if (source.getUserId().equals(targetUserId)) {
+            throw new RuntimeException("不能导入自己的歌单");
+        }
+
+        // 复制为独立副本
+        Playlist copy = new Playlist(source.getName() + "（导入）", false);
+        copy.setDescription(source.getDescription());
+        copy.setUserId(targetUserId);
+        copy.setSongIds(new ArrayList<>(source.getSongIds()));
+        copy.setTags(new ArrayList<>(source.getTags() != null ? source.getTags() : List.of()));
+        if (source.getCoverImage() != null) copy.setCoverImage(source.getCoverImage());
+        return playlistRepository.save(copy);
+    }
+
+    /** 查询推荐码对应的歌单信息（预览用） */
+    public Map<String, Object> previewShareCode(String code) {
+        Playlist pl = playlistRepository.findByShareCode(code)
+                .orElseThrow(() -> new RuntimeException("推荐码不存在"));
+        if (pl.getShareCodeExpiry() == null ||
+                System.currentTimeMillis() > pl.getShareCodeExpiry()) {
+            throw new RuntimeException("推荐码已过期");
+        }
+        return Map.of(
+                "name", pl.getName(),
+                "songCount", pl.getSongIds().size(),
+                "description", pl.getDescription() != null ? pl.getDescription() : ""
+        );
+    }
+
 }
