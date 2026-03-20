@@ -29,6 +29,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  ai:
+    openai:
+      api-key: ${AI_API_KEY} # 读取环境变量
+      base-url: https://api.deepseek.com  # 核心魔法：把请求地址指向 DeepSeek
+      chat:
+        options:
+          model: deepseek-chat # 使用 DeepSeek V3 模型 (便宜且支持 Function Calling)
 
 
 #debug: true

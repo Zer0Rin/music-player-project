@@ -1,8 +1,10 @@
 <template>
   <div class="player-bar liquid-panel">
-    <div class="bar-progress" ref="progressRef" @click="onProgressClick">
+    <div class="bar-progress" ref="progressRef"
+         @click="onProgressClick"
+         @mousedown="onProgressMouseDown">
       <div class="bar-progress-bg"></div>
-      <div class="bar-progress-fill" :style="{ width: (store.progress * 100) + '%' }">
+      <div class="bar-progress-fill" :style="{ width: (displayProgress * 100) + '%' }">
         <div class="bar-progress-glow"></div>
       </div>
     </div>
@@ -158,10 +160,39 @@ const playModeLabel = computed(() => {
   }[store.playMode]
 })
 
+const isDragging = ref(false)
+const dragProgress = ref(0)
+
+const displayProgress = computed(() => {
+  return isDragging.value ? dragProgress.value : store.progress
+})
+
+function onProgressMouseDown(e) {
+  isDragging.value = true
+  dragProgress.value = getRatio(e)
+
+  const onMouseMove = (e) => {
+    dragProgress.value = getRatio(e)
+  }
+  const onMouseUp = (e) => {
+    isDragging.value = false
+    emit('seek', getRatio(e) * store.duration)
+    window.removeEventListener('mousemove', onMouseMove)
+    window.removeEventListener('mouseup', onMouseUp)
+  }
+
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
 function onProgressClick(e) {
-  const rect = progressRef.value.getBoundingClientRect()
-  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  const ratio = getRatio(e)
   emit('seek', ratio * store.duration)
+}
+
+function getRatio(e) {
+  const rect = progressRef.value.getBoundingClientRect()
+  return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
 }
 
 function openLyrics() { if (store.currentSong) store.openLyricView() }
@@ -348,7 +379,7 @@ function openLyrics() { if (store.currentSong) store.openLyricView() }
 .bar-song:hover .bar-cover { transform: scale(1.08) rotate(-2deg); }
 
 .cover-expand-hint { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.4); border-radius: 10px; opacity: 0; color: white; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); transition: all 0.3s ease; }
-.bar-song:hover .cover-expand-hint { opacity: 1; }
+.bar-song:hover .cover-expand-hint { opacity: 1; transform: scale(1.1); }
 
 .bar-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .bar-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

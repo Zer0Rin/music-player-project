@@ -12,7 +12,7 @@ export const usePlayerStore = defineStore('player', {
       duration: 0,
       lyricsText: '',
       parsedLyrics: [],
-      volume: 0.8,
+      volume: 0.5,
       playMode: 'sequence',
       lyricMode: 'line',
       showLyricView: false,

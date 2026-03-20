@@ -22,6 +22,13 @@
         <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
         <span>全部歌曲</span>
       </a>
+      <a class="nav-item" @click.prevent="aiModalOpen = true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" style="color: var(--accent);">
+          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-14a6 6 0 0 0-6 6h2a4 4 0 0 1 8 0h2a6 6 0 0 0-6-6z"/>
+          <circle cx="12" cy="12" r="2"/>
+        </svg>
+        <span style="font-weight: 700; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; color: transparent;">AI DJ</span>
+      </a>
       <a class="nav-item" :class="{ active: plStore.activePlaylistId === 'community' }" @click.prevent="navToCustom('community')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
           <path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path>
@@ -92,6 +99,10 @@
         <div class="ctx-item ctx-danger" @click="deletePl">删除歌单</div>
       </div>
       <div v-if="menuVisible" class="ctx-backdrop" @click="menuVisible = false" />
+      <AiDjModal
+          :visible="aiModalOpen"
+          @close="aiModalOpen = false"
+      />
     </Teleport>
 
     <!-- 用户信息区 -->
@@ -181,6 +192,12 @@ function openImportModal() {
   addMenuOpen.value = false
   showImport.value = true
 }
+
+//  AI DJ
+import AiDjModal from '~/components/playlist/AiDjModal.vue'
+
+// 新增控制弹窗的状态
+const aiModalOpen = ref(false)
 
 
 </script>

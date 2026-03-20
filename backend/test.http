@@ -1,0 +1,5 @@
+POST http://localhost:8080/api/ai-dj/generate
+Content-Type: text/plain
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzNTM0OGViMC0yMmVlLTQ1ZGQtYTJjOC00OTg4ZjNiMDI1MGIiLCJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzczOTc0Njk2LCJleHAiOjE3NzQwNjEwOTZ9.l-koWdG2POp68PuhPyZDD1_She4zh3k6UTP33zxIgrk
+
+来点周杰伦的歌

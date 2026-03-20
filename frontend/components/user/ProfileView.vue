@@ -128,7 +128,13 @@
           <div class="playlist-grid">
             <div v-if="plStore.favorites" class="playlist-card liquid-card" @click="navTo(plStore.favorites.id)">
               <div class="fav-cover">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                <img v-if="plStore.favorites.songIds?.length > 0"
+                     :src="`/api/songs/${plStore.favorites.songIds[0]}/cover`"
+                     class="fav-bg-img" />
+
+                <div class="fav-icon-wrapper">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                </div>
               </div>
               <div class="pl-meta">
                 <div class="pl-name">我喜欢</div>
@@ -139,6 +145,9 @@
             <div v-for="pl in plStore.userPlaylists" :key="pl.id" class="playlist-card liquid-card" @click="navTo(pl.id)">
               <div class="pl-cover-wrap">
                 <img v-if="pl.coverImage" :src="`/api/playlists/${pl.id}/cover?t=${Date.now()}`" class="pl-cover" />
+
+                <img v-else-if="pl.songIds && pl.songIds.length > 0" :src="`/api/songs/${pl.songIds[0]}/cover`" class="pl-cover" />
+
                 <div v-else class="pl-cover-placeholder">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                 </div>
@@ -397,8 +406,20 @@ async function changePassword() {
 .save-msg { font-size: 13px; color: #4ade80; }
 .save-msg.error { color: #f87171; }
 .action-btns { display: flex; gap: 10px; flex-shrink: 0; }
-.save-btn { padding: 10px 20px; border-radius: 12px; border: none; background: rgba(139,92,246,0.4); color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.save-btn:hover { background: rgba(139,92,246,0.55); }
+.save-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(239, 68, 68, 0.85); /* 经典红 */
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.save-btn:hover {
+  background: rgba(220, 38, 38, 1); /* 悬浮时加深 */
+}
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 统计卡片 */
@@ -428,13 +449,44 @@ async function changePassword() {
 }
 .playlist-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.06); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
 
+/* 容器加上相对定位和溢出隐藏 */
 .fav-cover {
   width: 100%; aspect-ratio: 1;
   border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.1) 0%, rgba(255, 45, 85, 0.02) 100%);
+}
+
+/* 模糊的氛围背景图 */
+.fav-bg-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0.8; /* 降低透明度，不抢风头 */
+  filter: blur(1px) saturate(120%); /* 高斯模糊 + 饱和度拉高，变成彩色光斑 */
+  transform: scale(1.10); /* 放大一点，防止模糊后边缘漏出黑边 */
+}
+
+/* 悬浮的红心 */
+/* 1. 默认状态（未悬浮）：红心变淡，光晕收敛 */
+.fav-icon-wrapper {
+  position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   color: #ff2d55;
-  background: linear-gradient(135deg, rgba(255, 45, 85, 0.1) 0%, rgba(255, 45, 85, 0.02) 100%);
-  margin-bottom: 10px;
+  z-index: 2;
+
+  opacity: 0.65; /* 未悬浮时透明度降低，显得淡一点 */
+  filter: drop-shadow(0 2px 6px rgba(255, 45, 85, 0.3)); /* 光晕减弱 */
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); /* 添加极其丝滑的过渡动画 */
+}
+
+/* 2. 悬浮状态：当鼠标悬浮在整个歌单卡片上时，红心完全点亮 */
+.playlist-card:hover .fav-icon-wrapper {
+  opacity: 1; /* 悬浮时完全不透明，颜色变得极其鲜艳 */
+  filter: drop-shadow(0 6px 16px rgba(255, 45, 85, 0.85)); /* 光晕瞬间增强 */
+  transform: scale(1.1); /* 微微放大，像心跳一样的视觉反馈 */
 }
 
 .pl-cover-wrap { width: 100%; aspect-ratio: 1; border-radius: 14px; overflow: hidden; margin-bottom: 10px; background: rgba(255,255,255,0.03); }
@@ -532,83 +584,82 @@ async function changePassword() {
 .admin-btn { padding: 10px 16px; border-radius: 10px; border: none; background: rgba(245,158,11,0.2); color: #fbbf24; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .admin-btn:hover { background: rgba(245,158,11,0.35); }
 
-/* =========================================
-   白天模式：冷冽冰灰玻璃（极致高斯模糊 + 淡灰滤镜）
-   ========================================= */
 
-/* 1. 全局卡片：拉满模糊度（50px），注入淡灰色调，舍弃纯白 */
-:global(.light-mode) .avatar-section,
-:global(.light-mode) .info-section,
-:global(.light-mode) .stats-section,
-:global(.light-mode) .playlist-card {
-  /* REQUIREMENT 2: 核心修改：注入淡中性灰色调 (rgba 100, 100, 100) */
-  background: rgba(100, 100, 100, 0.1);
-
-  /* REQUIREMENT 1: 核心修改：极致增强模糊度（从 20px 提到 50px） */
-  backdrop-filter: blur(50px) saturate(180%);
-  -webkit-backdrop-filter: blur(50px) saturate(180%);
-
-  /* 补充：极致清晰的白色高光白边，在灰玻璃上更显眼 */
-  border: 1px solid rgba(255, 255, 255, 0.3);
-
-  /* 补充：极柔和的底层阴影，增加浮起感 */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
-}
-
-/* 2. 悬浮态增强：悬浮时变得稍微实体一点，提供清脆的交互反馈 */
-:global(.light-mode) .playlist-card:hover {
-  background: rgba(100, 100, 100, 0.15);
-  border-color: rgba(255, 255, 255, 0.6);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06);
-}
-
-/* 3. 字体对比度极致加深：确保在灰玻璃上绝对清晰 */
-:global(.light-mode) .profile-title,
-:global(.light-mode) .section-title,
-:global(.light-mode) .content-heading,
-:global(.light-mode) .stat-num,
-:global(.light-mode) .pl-name {
-  color: #111 !important; /* 核心数据和标题用极致纯黑 */
-}
-
-:global(.light-mode) .form-group label,
-:global(.light-mode) .stat-label,
-:global(.light-mode) .pl-count,
-:global(.light-mode) .community-placeholder p {
-  color: #333 !important; /* 次要说明文字用深灰色 */
-  font-weight: 500;
-}
-
-/* 4. 内部凹陷元素（输入框、统计数字底块）：用淡淡的暗灰色压下去 */
-:global(.light-mode) .form-input,
-:global(.light-mode) .stat-item,
-:global(.light-mode) .pl-cover-wrap {
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  color: #111;
-  font-weight: 600;
-}
-:global(.light-mode) .form-input:focus {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(139,92,246,0.5);
-}
-
-/* 占位区风格保持虚线，但融入整体冰灰质感 */
-:global(.light-mode) .community-placeholder {
-  background: rgba(100, 100, 100, 0.05);
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
-  border: 2px dashed rgba(0, 0, 0, 0.1);
-  color: #333;
-}
-
-:global(.light-mode) .fav-cover {
-  background: rgba(255, 45, 85, 0.1);
-}
 
 /* 修改密码 */
 .password-section { width: 100%; display: flex; flex-direction: column; }
 .section-divider { width: 100%; height: 1px; background: rgba(255,255,255,0.06); margin: 8px 0 16px; }
 
+</style>
+
+<style>
+/* ============================================================
+   🌅 白天模式终极适配 - 个人主页 (非 scoped 纯净白玻璃质感)
+   ============================================================ */
+
+/* 1. 全局卡片：白色高亮底色，降低透明度，确保不透出杂乱背景 */
+.light-mode .avatar-section,
+.light-mode .info-section,
+.light-mode .stats-section,
+.light-mode .playlist-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+/* 2. 悬浮态增强：更实的白底，增加轻盈阴影 */
+.light-mode .playlist-card:hover {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+}
+
+/* 3. 字体对比度极致加深：核心数据和标题用纯黑 */
+.light-mode .profile-title,
+.light-mode .section-title,
+.light-mode .content-heading,
+.light-mode .stat-num,
+.light-mode .pl-name {
+  color: #1a1a1a !important;
+}
+
+/* 次要说明文字用中度灰 */
+.light-mode .form-group label,
+.light-mode .stat-label,
+.light-mode .pl-count,
+.light-mode .community-placeholder p {
+  color: #4b5563 !important;
+  font-weight: 500;
+}
+
+/* 4. 内部凹陷元素（输入框、统计数字底块）：淡淡的浅灰底色 */
+.light-mode .form-input,
+.light-mode .stat-item,
+.light-mode .pl-cover-wrap {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #111;
+  font-weight: 500;
+}
+
+/* 输入框焦点态：因为按钮变成了红色，边框焦点也统一变成红色的微光 */
+.light-mode .form-input:focus {
+  background: #ffffff;
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* 5. 占位区和分割线 */
+.light-mode .community-placeholder {
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px dashed rgba(0, 0, 0, 0.15);
+  color: #4b5563;
+}
+
+.light-mode .section-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
 </style>

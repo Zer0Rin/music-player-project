@@ -40,6 +40,10 @@ public class SecurityConfig {
                         // 登录注册放行
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        //  AI DJ 接口发“免死金牌”，允许所有人调用
+                        .requestMatchers("/api/ai-dj/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+
                         //分享码
                         .requestMatchers("/api/playlists/share/preview/**").permitAll()
 

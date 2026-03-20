@@ -171,17 +171,27 @@ export const usePlaylistStore = defineStore('playlist', {
 
         /** 切换收藏 */
         async toggleFavorite(songId) {
-            try {
-                const { $apiFetch } = useNuxtApp()
-                await $apiFetch('/api/playlists/favorites/toggle', {
-                    method: 'POST',
-                    body: { songId },
-                })
-                // 重新加载歌单数据以同步
-                await this.fetchPlaylists()
-            } catch (e) {
-                console.error('收藏切换失败:', e)
+            const { $apiFetch } = useNuxtApp()
+            // 找到收藏歌单
+            const fav = this.playlists.find(p => p.system === true || p.isSystem === true)
+            if (!fav) return
+
+            // 乐观更新：先修改本地状态
+            const idx = fav.songIds.indexOf(songId)
+            if (idx >= 0) {
+                fav.songIds.splice(idx, 1)
+            } else {
+                fav.songIds.unshift(songId)
             }
+
+            // 后台异步同步，不 await
+            $apiFetch('/api/playlists/favorites/toggle', {
+                method: 'POST',
+                body: { songId },
+            }).catch(async () => {
+                // 请求失败时回滚
+                await this.fetchPlaylists()
+            })
         },
 
         /** 切换查看的歌单 */

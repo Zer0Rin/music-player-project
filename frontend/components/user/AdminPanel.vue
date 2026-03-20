@@ -9,7 +9,7 @@
             <div class="admin-tabs">
               <button :class="['admin-tab', { active: activeTab === 'songs' }]" @click="activeTab = 'songs'">
                 歌曲
-                <span class="tab-count">{{ songs.length }}</span>
+                <span class="tab-count">{{ filteredAndSortedSongs.length }}</span>
               </button>
               <button :class="['admin-tab', { active: activeTab === 'community' }]" @click="activeTab = 'community'">
                 社区
@@ -630,4 +630,89 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
   font-size: 13px;
 }
 
+</style>
+
+
+<style>
+/* ============================================================
+   🌅 白天模式终极适配 - 管理面板 (非 scoped)
+   ============================================================ */
+.light-mode .admin-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+  /* 覆盖局部文字颜色变量，确保白天文字清晰 */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+}
+
+/* 顶部标签栏 */
+.light-mode .admin-tab { color: var(--text-secondary); }
+.light-mode .admin-tab.active {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+.light-mode .tab-count {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-secondary);
+}
+.light-mode .close-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-secondary);
+}
+.light-mode .close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+
+/* 搜索栏 */
+.light-mode .admin-search-bar {
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.light-mode .admin-search-input { color: #111; }
+
+/* 列表区 */
+.light-mode .list-header { border-bottom-color: rgba(0, 0, 0, 0.06); }
+.light-mode .song-row:hover { background: rgba(0, 0, 0, 0.03); }
+.light-mode .song-row.selected { background: rgba(139, 92, 246, 0.1); }
+.light-mode .row-cover-placeholder { background: rgba(0, 0, 0, 0.06); color: var(--text-tertiary); }
+
+/* 右侧详情面板 */
+.light-mode .detail-panel {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+.light-mode .field-input {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.light-mode .field-input:focus { border-color: rgba(139, 92, 246, 0.6); }
+.light-mode .detail-cover-placeholder { background: rgba(0, 0, 0, 0.04); color: var(--text-tertiary); }
+.light-mode .file-upload-btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: var(--text-secondary);
+}
+.light-mode .file-upload-btn:hover {
+  border-color: #9ca3af;
+  color: var(--text-primary);
+}
+
+/* 上传区 */
+.light-mode .upload-zone { border-color: rgba(0, 0, 0, 0.15); }
+.light-mode .upload-zone.dragging {
+  background: rgba(139, 92, 246, 0.05);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+.light-mode .pending-item { background: rgba(0, 0, 0, 0.04); }
+.light-mode .add-more-btn { border-color: rgba(0, 0, 0, 0.15); color: var(--text-secondary); }
+.light-mode .progress-bar { background: rgba(0, 0, 0, 0.08); }
 </style>

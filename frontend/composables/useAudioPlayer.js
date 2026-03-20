@@ -106,6 +106,10 @@ export function useAudioPlayer() {
       _audioCtx.resume()
     }
 
+      setTimeout(() => {
+          _audio.play().catch(console.error)
+      }, 500)
+
     _audio.play().catch(console.error)
   }
 

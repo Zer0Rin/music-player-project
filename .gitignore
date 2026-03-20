@@ -2,12 +2,15 @@
 backend/target/
 backend/*.iml
 backend/.mvn/wrapper/maven-wrapper.jar
+backend/music-data/  # 建议忽略本地测试的 SQLite 数据库和上传的文件
+backend/application-secret.yml
 
 # Frontend
 frontend/node_modules/
 frontend/.nuxt/
 frontend/.output/
 frontend/dist/
+frontend/.env
 
 # Music data (don't commit large media files)
 backend/music-data/audio/*.mp3

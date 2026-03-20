@@ -194,3 +194,38 @@ function formatExpiry(ts) {
 .modal-fade-enter-active, .modal-fade-leave-active { transition: all 0.3s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; transform: scale(0.96); }
 </style>
+
+
+<style>
+.light-mode .share-modal {
+  background: rgba(255,255,255,0.85);
+}
+.light-mode .share-modal .share-desc,
+.light-mode .share-modal .expiry-hint {
+  color: #666;
+}
+.light-mode .share-modal .code-display {
+  background: rgba(0,0,0,0.05);
+}
+.light-mode .share-modal .code-text {
+  color: #111;
+}
+.light-mode .share-modal .import-input {
+  border-color: rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.03);
+  color: #111;
+}
+.light-mode .share-modal .preview-card {
+  background: rgba(0,0,0,0.03);
+}
+.light-mode .share-modal .preview-name {
+  color: #111;
+}
+.light-mode .share-modal .preview-meta,
+.light-mode .share-modal .preview-desc {
+  color: #666;
+}
+.light-mode .share-modal h3 {
+  color: #111;
+}
+</style>
