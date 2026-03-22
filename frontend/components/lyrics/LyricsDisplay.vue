@@ -7,7 +7,7 @@
           @click.stop="seekToFocusedLine"
       >
         <div class="seek-line"></div>
-        <span class="seek-time">{{ formatTime(store.parsedLyrics[focusedIndex].time) }}</span>
+        <span class="seek-time">{{ formatTime(store.parsedLyrics[focusedIndex]?.time) }}</span>
         <div class="seek-play-icon">
           <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path d="M8 5v14l11-7z"/>
@@ -88,7 +88,7 @@ const userScrolling = ref(false)
 const focusedIndex = ref(-1)
 let userScrollTimer = null
 
-// 💡 区分程序滚动和用户滚动
+// 区分程序滚动和用户滚动
 let isProgrammaticScroll = false
 
 function setLineRef(el, index) { if (el) lineRefs.value[index] = el }
@@ -110,7 +110,6 @@ function handleScroll() {
   const scrollTop = scrollRef.value.scrollTop
   const containerHeight = scrollRef.value.clientHeight
 
-  // 💡 使用你测试过的完美高度比例：0.45
   const focusY = scrollTop + containerHeight * 0.40
 
   let closestIndex = 0

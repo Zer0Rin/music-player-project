@@ -68,6 +68,9 @@ public class SecurityConfig {
                         // 用户自己的信息
                         .requestMatchers("/api/user/**").authenticated()
 
+                        //放行 评论
+                        .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

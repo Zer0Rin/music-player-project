@@ -124,6 +124,24 @@
 
     <ShareCodeModal :visible="showImport" :playlist-id="null" @close="showImport = false" />
 
+
+    <!-- 删除确认弹窗 -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showDeleteConfirm" class="delete-backdrop" @click.self="showDeleteConfirm = false">
+          <div class="delete-modal liquid-panel">
+            <h3 class="delete-title">删除歌单</h3>
+            <p class="delete-desc">确定删除歌单「<span class="delete-name">{{ deleteTarget?.name }}</span>」吗？此操作不可恢复。</p>
+            <div class="delete-actions">
+              <button class="cancel-btn" @click="showDeleteConfirm = false">取消</button>
+              <button class="confirm-btn" @click="confirmDelete">删除</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+
   </aside>
 </template>
 
@@ -177,7 +195,27 @@ const menuTarget = ref(null)
 
 function openPlMenu(e, pl) { menuTarget.value = pl; menuX.value = e.clientX; menuY.value = e.clientY; menuVisible.value = true }
 function startRename() { const pl = menuTarget.value; if (!pl) return; const name = prompt('重命名歌单', pl.name); if (name?.trim()) plStore.renamePlaylist(pl.id, name.trim()) }
-function deletePl() { const pl = menuTarget.value; if (!pl) return; if (confirm(`确定删除歌单「${pl.name}」吗？`)) plStore.deletePlaylist(pl.id) }
+
+
+const showDeleteConfirm = ref(false)
+const deleteTarget = ref(null)
+
+function deletePl() {
+  const pl = menuTarget.value
+  if (!pl) return
+  deleteTarget.value = pl
+  showDeleteConfirm.value = true
+  menuVisible.value = false
+}
+
+function confirmDelete() {
+  if (deleteTarget.value) {
+    plStore.deletePlaylist(deleteTarget.value.id)
+  }
+  showDeleteConfirm.value = false
+  deleteTarget.value = null
+}
+
 
 function goProfile() {
   plStore.activePlaylistId = 'profile'
@@ -440,6 +478,32 @@ const aiModalOpen = ref(false)
 .pl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 
+/* 歌单删除弹框 */
+.delete-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+}
+.delete-modal {
+  width: 320px; border-radius: 16px; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.delete-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.delete-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+.delete-name { color: var(--text-primary); font-weight: 600; }
+.delete-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.cancel-btn {
+  padding: 8px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+  background: transparent; color: var(--text-secondary);
+  font-size: 14px; cursor: pointer; transition: all 0.2s;
+}
+.cancel-btn:hover { background: rgba(255,255,255,0.06); }
+.confirm-btn {
+  padding: 8px 20px; border-radius: 10px; border: none;
+  background: rgba(248,113,113,0.3); color: #f87171;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.confirm-btn:hover { background: rgba(248,113,113,0.5); }
 
 
 </style>

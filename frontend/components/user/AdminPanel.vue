@@ -20,7 +20,7 @@
                 <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                   <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
                 </svg>
-                上传歌曲
+                上传
               </button>
               <button class="close-btn" @click="$emit('close')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -42,18 +42,23 @@
                 <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32" style="opacity:0.4">
                   <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
                 </svg>
-                <span>拖拽或点击上传音频文件</span>
-                <span class="drop-hint">MP3 / FLAC / WAV / OGG / M4A</span>
+                <span>拖拽或点击上传文件</span>
+                <span class="drop-hint">音频 / 封面图片 / 歌词（文件名需一致才能匹配）</span>
               </div>
-              <div v-else class="pending-files" @click.stop>
-                <div v-for="(f, i) in pendingFiles" :key="i" class="pending-item">
-                  <span class="pending-name">{{ f.name }}</span>
-                  <span class="pending-size">{{ formatSize(f.size) }}</span>
-                  <span v-if="fileStatus[f.name] === 'ok'" class="status-ok">✓</span>
-                  <span v-else-if="fileStatus[f.name] === 'error'" class="status-err">✗</span>
-                  <div v-else-if="uploading" class="status-spinner" />
-                  <button v-if="!uploading && !fileStatus[f.name]" class="remove-btn" @click="pendingFiles.splice(i,1)">×</button>
+              <div class="pending-files" @click.stop>
+
+                <div class="pending-list-scroll custom-scrollbar">
+                  <div v-for="(f, i) in pendingFiles" :key="i" class="pending-item">
+                    <span class="file-type-tag" :class="'type-' + getFileType(f.name)">{{ getFileType(f.name) }}</span>
+                    <span class="pending-name">{{ f.name }}</span>
+                    <span class="pending-size">{{ formatSize(f.size) }}</span>
+                    <span v-if="fileStatus[f.name] === 'ok'" class="status-ok">✓</span>
+                    <span v-else-if="fileStatus[f.name] === 'error'" class="status-err" title="未匹配或上传失败">✗</span>
+                    <div v-else-if="uploading" class="status-spinner" />
+                    <button v-if="!uploading && !fileStatus[f.name]" class="remove-btn" @click="removeFile(f)">×</button>
+                  </div>
                 </div>
+
                 <div class="pending-actions" @click.stop>
                   <button class="add-more-btn" @click="triggerFileInput">+ 添加更多</button>
                   <div class="progress-wrap" v-if="uploading || uploadDone">
@@ -65,6 +70,7 @@
                   </button>
                   <button v-if="uploadDone" class="do-upload-btn liquid-btn" @click="resetUpload">继续上传</button>
                 </div>
+
               </div>
             </div>
           </Transition>
@@ -82,6 +88,11 @@
                 </svg>
                 <input v-model="searchQuery" type="text" placeholder="搜索歌曲标题、艺术家或专辑..." class="admin-search-input" />
                 <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''">×</button>
+
+                <div class="sort-toggle">
+                  <button class="sort-btn" :class="{ active: sortMode === 'newest' }" @click="sortMode = 'newest'" title="最新上传优先">时间</button>
+                  <button class="sort-btn" :class="{ active: sortMode === 'default' }" @click="sortMode = 'default'" title="按标题字母排序">A-Z</button>
+                </div>
               </div>
 
               <div class="list-header">
@@ -105,6 +116,7 @@
                   </div>
                   <div class="col-title">
                     <span class="song-title">{{ song.title }}</span>
+                    <span v-if="!song.coverFile || !song.lyricsFile" class="missing-badge" :title="getMissingTip(song)">!</span>
                   </div>
                   <span class="col-artist">{{ song.artist || '—' }}</span>
                   <span class="col-album">{{ song.album || '—' }}</span>
@@ -117,6 +129,22 @@
                     </button>
                   </div>
                 </div>
+
+                <!-- 删除确认弹窗，放在列表外面 -->
+                <Teleport to="body">
+                  <Transition name="modal-fade">
+                    <div v-if="showDeleteConfirm" class="delete-backdrop" @click.self="showDeleteConfirm = false">
+                      <div class="delete-modal liquid-panel">
+                        <h3 class="delete-title">删除歌曲</h3>
+                        <p class="delete-desc">确定删除「<span class="delete-name">{{ deleteTarget?.title }}</span>」吗？此操作不可恢复。</p>
+                        <div class="delete-actions">
+                          <button class="cancel-btn" @click="showDeleteConfirm = false">取消</button>
+                          <button class="confirm-btn" @click="confirmDelete">删除</button>
+                        </div>
+                      </div>
+                    </div>
+                  </Transition>
+                </Teleport>
 
                 <div v-if="!filteredAndSortedSongs.length" class="admin-empty-state">
                   未找到相关歌曲
@@ -200,16 +228,33 @@
 
                 <!-- 文件上传 -->
                 <div class="file-uploads">
-                  <div class="file-upload-row">
+
+                  <div class="file-upload-row"
+                       @dragover.prevent="isDraggingCover = true"
+                       @dragleave.prevent="isDraggingCover = false"
+                       @drop.prevent="onDropCover">
                     <span>替换封面</span>
                     <input type="file" accept="image/*" class="hidden-input" :ref="el => fileRefs.cover = el" @change="uploadCover" />
                     <button class="file-upload-btn" @click="fileRefs.cover?.click()">选择图片</button>
+
+                    <div v-show="isDraggingCover" class="drag-overlay">
+                      松开鼠标上传封面...
+                    </div>
                   </div>
-                  <div class="file-upload-row">
+
+                  <div class="file-upload-row"
+                       @dragover.prevent="isDraggingLyrics = true"
+                       @dragleave.prevent="isDraggingLyrics = false"
+                       @drop.prevent="onDropLyrics">
                     <span>替换歌词</span>
                     <input type="file" accept=".lrc,.elrc" class="hidden-input" :ref="el => fileRefs.lyrics = el" @change="uploadLyrics" />
                     <button class="file-upload-btn" @click="fileRefs.lyrics?.click()">选择歌词</button>
+
+                    <div v-show="isDraggingLyrics" class="drag-overlay">
+                      松开鼠标上传歌词...
+                    </div>
                   </div>
+
                 </div>
 
                 <!-- 保存按钮 -->
@@ -224,7 +269,9 @@
 
           </div>
         </div>
-        <input ref="fileInput" type="file" multiple accept=".mp3,.flac,.wav,.ogg,.m4a" class="hidden-input" @change="onFileSelect" />
+        <input ref="fileInput" type="file" multiple
+               accept=".mp3,.flac,.wav,.ogg,.m4a,.jpg,.jpeg,.png,.webp,.lrc,.elrc"
+               class="hidden-input" @change="onFileSelect" />
       </div>
     </Transition>
   </Teleport>
@@ -235,6 +282,9 @@ const props = defineProps({ visible: Boolean })
 const emit = defineEmits(['close', 'uploaded'])
 const { $apiFetch } = useNuxtApp()
 
+//管理 删除 歌单
+const usePlStore = () => usePlaylistStore()
+
 //搜索歌曲
 const activeTab = ref('songs')
 const songs = ref([])
@@ -244,9 +294,16 @@ const coverTs = ref(Date.now())
 // 搜索关键词
 const searchQuery = ref('')
 
-// 计算属性（同时处理过滤和默认排序）
+// 排序模式状态，默认设为 'newest' (最新上传)
+const sortMode = ref('newest')
+
+// 计算属性（同时处理过滤和动态排序）
 const filteredAndSortedSongs = computed(() => {
-  let result = songs.value
+  // 给每首歌打上一个原始的排序序号（_index）
+  // 后端默认返回的列表通常是“旧的在前，新的在后”，这个序号可以作为终极兜底
+  let result = songs.value.map((song, index) => {
+    return { ...song, _index: index }
+  })
 
   // 1. 搜索过滤
   if (searchQuery.value.trim()) {
@@ -258,12 +315,32 @@ const filteredAndSortedSongs = computed(() => {
     )
   }
 
-  // 2. 默认排序：按标题数字、字母、中文拼音顺序（升序）
-  return result.slice().sort((a, b) => {
-    const titleA = a.title || ''
-    const titleB = b.title || ''
-    // localeCompare 是处理字符串排序的神器，{ numeric: true } 能让 "2" 排在 "10" 前面
-    return titleA.localeCompare(titleB, 'zh-CN', { numeric: true })
+  // 2. 根据用户选择的模式排序
+  return result.sort((a, b) => {
+    if (sortMode.value === 'newest') {
+
+      // 方案 A：如果后端实体类里写了时间字段 (如 createdAt, uploadTime)，这是最准的，优先用它倒序
+      const timeA = a.createdAt || a.createTime || a.uploadTime
+      const timeB = b.createdAt || b.createTime || b.uploadTime
+      if (timeA && timeB) {
+        return new Date(timeB).getTime() - new Date(timeA).getTime()
+      }
+
+      // 方案 B：如果你的后端 id 确实是纯数字自增，按数字倒序
+      if (!isNaN(a.id) && !isNaN(b.id)) {
+        return Number(b.id) - Number(a.id)
+      }
+
+      // 方案 C（终极兜底）：如果 id 是乱码 UUID 且没有时间字段，
+      // 我们直接根据刚才打上的 `_index` 原始序号反转，确保最后拿到的新歌在最上面！
+      return b._index - a._index
+
+    } else {
+      // 模式 B：A-Z 拼音字母顺序
+      const titleA = a.title || ''
+      const titleB = b.title || ''
+      return titleA.localeCompare(titleB, 'zh-CN', { numeric: true })
+    }
   })
 })
 
@@ -332,9 +409,22 @@ async function saveDetail() {
   }
 }
 
-async function uploadCover(e) {
-  const file = e.target.files?.[0]
+// 💡 新增：拖拽状态控制
+const isDraggingCover = ref(false)
+const isDraggingLyrics = ref(false)
+
+// --- 封面处理逻辑 ---
+async function processCoverFile(file) {
   if (!file || !selectedSong.value) return
+
+  // 拦截非图片文件 (允许 jpg, png, webp, gif 等)
+  if (!file.type.startsWith('image/')) {
+    detailMsg.value = '格式错误：请拖入图片文件'
+    detailError.value = true
+    setTimeout(() => detailMsg.value = '', 3000)
+    return // 拦截，终止上传！
+  }
+
   const formData = new FormData()
   formData.append('file', file)
   try {
@@ -347,13 +437,33 @@ async function uploadCover(e) {
     detailMsg.value = '封面上传失败'
     detailError.value = true
   }
-  e.target.value = ''
   setTimeout(() => detailMsg.value = '', 3000)
 }
 
-async function uploadLyrics(e) {
-  const file = e.target.files?.[0]
+function uploadCover(e) {
+  processCoverFile(e.target.files?.[0])
+  e.target.value = '' // 清空 input
+}
+
+function onDropCover(e) {
+  isDraggingCover.value = false
+  processCoverFile(e.dataTransfer.files?.[0])
+}
+
+
+// --- 歌词处理逻辑 ---
+async function processLyricsFile(file) {
   if (!file || !selectedSong.value) return
+
+  // 精准拦截非歌词文件 (仅放行 .lrc 和 .elrc)
+  const fileName = file.name.toLowerCase()
+  if (!fileName.endsWith('.lrc') && !fileName.endsWith('.elrc')) {
+    detailMsg.value = '格式错误：仅支持 .lrc 或 .elrc 文件'
+    detailError.value = true
+    setTimeout(() => detailMsg.value = '', 3000)
+    return // 拦截，终止上传！
+  }
+
   const formData = new FormData()
   formData.append('file', file)
   try {
@@ -365,19 +475,41 @@ async function uploadLyrics(e) {
     detailMsg.value = '歌词上传失败'
     detailError.value = true
   }
-  e.target.value = ''
   setTimeout(() => detailMsg.value = '', 3000)
 }
 
-async function deleteSong(song) {
-  if (!confirm(`确定删除「${song.title}」吗？此操作不可恢复`)) return
+function uploadLyrics(e) {
+  processLyricsFile(e.target.files?.[0])
+  e.target.value = '' // 清空 input
+}
+
+function onDropLyrics(e) {
+  isDraggingLyrics.value = false
+  processLyricsFile(e.dataTransfer.files?.[0])
+}
+
+const showDeleteConfirm = ref(false)
+const deleteTarget = ref(null)
+
+function deleteSong(song) {
+  deleteTarget.value = song
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value) return
   try {
-    await $apiFetch(`/api/songs/${song.id}`, { method: 'DELETE' })
-    songs.value = songs.value.filter(s => s.id !== song.id)
-    if (selectedSong.value?.id === song.id) selectedSong.value = null
+    await $apiFetch(`/api/songs/${deleteTarget.value.id}`, { method: 'DELETE' })
+    songs.value = songs.value.filter(s => s.id !== deleteTarget.value.id)
+    if (selectedSong.value?.id === deleteTarget.value.id) selectedSong.value = null
     emit('uploaded')
+    const plStore = usePlaylistStore()
+    await plStore.fetchPlaylists()
   } catch {
-    alert('删除失败')
+    // 失败不提示
+  } finally {
+    showDeleteConfirm.value = false
+    deleteTarget.value = null
   }
 }
 
@@ -385,18 +517,50 @@ async function deleteSong(song) {
 function triggerFileInput() { fileInput.value?.click() }
 function onFileSelect(e) { addFiles(Array.from(e.target.files || [])); e.target.value = '' }
 function onDrop(e) { isDragging.value = false; addFiles(Array.from(e.dataTransfer.files)) }
-function addFiles(files) {
-  const exts = ['.mp3','.flac','.wav','.ogg','.m4a']
-  const existing = new Set(pendingFiles.value.map(f => f.name))
-  files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext)))
-      .forEach(f => { if (!existing.has(f.name)) pendingFiles.value.push(f) })
+
+
+const pendingAudio = ref([])
+const pendingCovers = ref([])
+const pendingLyrics = ref([])
+
+function getFileType(filename) {
+  const name = filename.toLowerCase()
+  if (['.mp3','.flac','.wav','.ogg','.m4a'].some(e => name.endsWith(e))) return '音频'
+  if (['.jpg','.jpeg','.png','.webp'].some(e => name.endsWith(e))) return '封面'
+  if (['.lrc','.elrc'].some(e => name.endsWith(e))) return '歌词'
+  return null
 }
+
+function getBaseName(filename) {
+  return filename.substring(0, filename.lastIndexOf('.'))
+}
+
+function addFiles(files) {
+  files.forEach(f => {
+    const type = getFileType(f.name)
+    if (!type) return
+    if (type === '音频' && !pendingAudio.value.find(x => x.name === f.name)) pendingAudio.value.push(f)
+    if (type === '封面' && !pendingCovers.value.find(x => x.name === f.name)) pendingCovers.value.push(f)
+    if (type === '歌词' && !pendingLyrics.value.find(x => x.name === f.name)) pendingLyrics.value.push(f)
+  })
+  syncPendingFiles()
+}
+
+function syncPendingFiles() {
+  pendingFiles.value = [...pendingAudio.value, ...pendingCovers.value, ...pendingLyrics.value]
+}
+
+
+
+
 
 async function startUpload() {
   uploading.value = true
   uploadedCount.value = 0
   fileStatus.value = {}
-  for (const file of pendingFiles.value) {
+
+  // 上传音频
+  for (const file of pendingAudio.value) {
     try {
       const formData = new FormData()
       formData.append('files', file)
@@ -405,15 +569,75 @@ async function startUpload() {
     } catch { fileStatus.value[file.name] = 'error' }
     uploadedCount.value++
   }
+
+  // 重新加载确保新歌曲入库
+  if (pendingAudio.value.length > 0) await loadSongs()
+
+  // 上传封面（文件名匹配）
+  for (const file of pendingCovers.value) {
+    const base = getBaseName(file.name)
+    const song = songs.value.find(s => getBaseName(s.audioFile) === base)
+    if (!song) { fileStatus.value[file.name] = 'error'; uploadedCount.value++; continue }
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await $apiFetch(`/api/songs/${song.id}/cover/upload`, { method: 'POST', body: formData })
+      fileStatus.value[file.name] = 'ok'
+    } catch { fileStatus.value[file.name] = 'error' }
+    uploadedCount.value++
+  }
+
+  // 上传歌词（文件名匹配）
+  for (const file of pendingLyrics.value) {
+    const base = getBaseName(file.name)
+    const song = songs.value.find(s => getBaseName(s.audioFile) === base)
+    if (!song) { fileStatus.value[file.name] = 'error'; uploadedCount.value++; continue }
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await $apiFetch(`/api/songs/${song.id}/lyrics/upload`, { method: 'POST', body: formData })
+      fileStatus.value[file.name] = 'ok'
+    } catch { fileStatus.value[file.name] = 'error' }
+    uploadedCount.value++
+  }
+
   uploading.value = false
   uploadDone.value = true
   await loadSongs()
   emit('uploaded')
 }
 
-function resetUpload() { pendingFiles.value = []; fileStatus.value = {}; uploadDone.value = false; uploadedCount.value = 0 }
+function resetUpload() {
+  pendingFiles.value = []
+  pendingAudio.value = []
+  pendingCovers.value = []
+  pendingLyrics.value = []
+  fileStatus.value = {}
+  uploadDone.value = false
+  uploadedCount.value = 0
+}
 function formatSize(b) { return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB' }
 function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); return `${m}:${String(s%60).padStart(2,'0')}` }
+
+
+// 歌名后 ！
+function getMissingTip(song) {
+  const missing = []
+  if (!song.coverFile) missing.push('封面')
+  if (!song.lyricsFile) missing.push('歌词')
+  return `缺少：${missing.join('、')}`
+}
+
+
+// 上传栏
+function removeFile(file) {
+  pendingAudio.value = pendingAudio.value.filter(f => f.name !== file.name)
+  pendingCovers.value = pendingCovers.value.filter(f => f.name !== file.name)
+  pendingLyrics.value = pendingLyrics.value.filter(f => f.name !== file.name)
+  syncPendingFiles()
+}
+
+
 </script>
 
 <style scoped>
@@ -561,7 +785,34 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
 .badge-missing { background: rgba(248,113,113,0.15); color: #f87171; }
 
 .file-uploads { display: flex; flex-direction: column; gap: 8px; }
-.file-upload-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+.file-upload-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--text-secondary);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: transparent;
+
+  /* 为遮罩层提供定位参考，并切掉溢出的圆角 */
+  position: relative;
+  overflow: hidden;
+}
+.drag-overlay {
+  position: absolute;
+  inset: 0; /* 铺满整行 */
+  background: rgba(139, 92, 246, 0.15); /* 紫色半透明背景 */
+  backdrop-filter: blur(2px); /* 微微模糊底下的原文字和按钮，质感拉满 */
+  border: 1px dashed rgba(139, 92, 246, 0.6);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+
+  /* 让鼠标事件穿透遮罩层，杜绝疯狂抖动 */
+  pointer-events: none;
+}
+
 .file-upload-btn {
   padding: 5px 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04); color: var(--text-secondary);
@@ -629,6 +880,109 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
   color: var(--text-tertiary);
   font-size: 13px;
 }
+
+
+/* 排序切换器 */
+.sort-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 3px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+.sort-btn {
+  background: transparent; border: none;
+  color: var(--text-tertiary); font-size: 12px; font-weight: 500;
+  padding: 4px 12px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+}
+.sort-btn.active {
+  background: rgba(139, 92, 246, 0.4);
+  color: white; font-weight: 600;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+}
+.sort-btn:hover:not(.active) { color: var(--text-primary); }
+
+/* 文件列表滚动区样式 */
+.pending-list-scroll {
+  max-height: 220px; /* 限制最大高度，大概能显示 6-7 个文件 */
+  overflow-y: auto;  /* 超出部分自动显示滚动条 */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 6px; /* 给滚动条留出一点呼吸空间，不挤压文字 */
+}
+
+/* 确保整体布局被压缩时，actions 不会变形 */
+.pending-actions {
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0; /* 防止按钮区被列表挤压变形 */
+  border-top: 1px solid rgba(255,255,255,0.05); /* 加一条极淡的分割线更好看 */
+}
+
+/* 白天模式下，加深一下分割线 */
+:global(.light-mode) .pending-actions {
+  border-top-color: rgba(0,0,0,0.05);
+}
+
+/* 歌名后 ！ 提示 */
+.missing-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(251,191,36,0.2);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+
+/* 上传栏 */
+.file-type-tag {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.type-音频 { background: rgba(139,92,246,0.2); color: #a78bfa; }
+.type-封面 { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.type-歌词 { background: rgba(16,185,129,0.2); color: #34d399; }
+
+
+/* 删除歌曲 弹窗 */
+.delete-backdrop {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+}
+.delete-modal {
+  width: 320px; border-radius: 16px; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.delete-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.delete-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+.delete-name { color: var(--text-primary); font-weight: 600; }
+.delete-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.cancel-btn {
+  padding: 8px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+  background: transparent; color: var(--text-secondary);
+  font-size: 14px; cursor: pointer; transition: all 0.2s;
+}
+.cancel-btn:hover { background: rgba(255,255,255,0.06); }
+.confirm-btn {
+  padding: 8px 20px; border-radius: 10px; border: none;
+  background: rgba(248,113,113,0.3); color: #f87171;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.confirm-btn:hover { background: rgba(248,113,113,0.5); }
+
+
 
 </style>
 
@@ -715,4 +1069,12 @@ function formatDuration(s) { if (!s) return '--'; const m = Math.floor(s/60); re
 .light-mode .pending-item { background: rgba(0, 0, 0, 0.04); }
 .light-mode .add-more-btn { border-color: rgba(0, 0, 0, 0.15); color: var(--text-secondary); }
 .light-mode .progress-bar { background: rgba(0, 0, 0, 0.08); }
+
+
+/* 白天模式下详情页的拖拽反馈 */
+.light-mode .file-upload-row.drag-active {
+  background: rgba(139, 92, 246, 0.05);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
 </style>

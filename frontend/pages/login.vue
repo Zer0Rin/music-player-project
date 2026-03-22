@@ -13,7 +13,7 @@
           <circle cx="20" cy="20" r="20" fill="rgba(250, 45, 72, 0.15)"/>
           <path d="M14 12v16l14-8-14-8z" fill="#fa2d48"/>
         </svg>
-        <span>My Music</span>
+        <span>Echoes</span>
       </div>
 
       <div class="tab-switch">
@@ -24,23 +24,43 @@
       <div class="form-body">
         <div class="input-group">
           <label>用户名</label>
-          <input v-model="form.username" type="text" placeholder="请输入用户名" @keyup.enter="submit" />
+          <input
+              v-model="form.username"
+              type="text"
+              placeholder="请输入用户名(ID)"
+              :class="{ 'error-shake': errors.username }"
+              @keyup.enter="submit"
+              @input="errors.username = false; errorMsg = ''"
+          />
         </div>
 
         <div v-if="mode === 'register'" class="input-group">
           <label>昵称（可选）</label>
-          <input v-model="form.nickname" type="text" placeholder="显示名称，默认同用户名" />
+          <input
+              v-model="form.nickname"
+              type="text"
+              placeholder="显示名称，默认同用户名"
+              :class="{ 'error-shake': errors.nickname }"
+              @input="errors.nickname = false; errorMsg = ''"
+          />
         </div>
 
         <div class="input-group">
           <label>密码</label>
-          <input v-model="form.password" type="password" placeholder="请输入密码" @keyup.enter="submit" />
+          <input
+              v-model="form.password"
+              type="password"
+              placeholder="请输入密码"
+              :class="{ 'error-shake': errors.password }"
+              @keyup.enter="submit"
+              @input="errors.password = false; errorMsg = ''"
+          />
         </div>
 
         <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
 
         <button class="submit-btn liquid-btn" :disabled="loading" @click="submit">
-          {{ loading ? '请稍候...' : (mode === 'login' ? '登录' : '注册') }}
+          {{ loading ? '连接中...' : (mode === 'login' ? '登 录' : '注 册') }}
         </button>
       </div>
     </div>
@@ -60,17 +80,42 @@ if (authStore.isLoggedIn) {
   router.push('/')
 }
 
+
 const mode = ref('login')
 const loading = ref(false)
 const errorMsg = ref('')
+
+// 追踪具体哪个字段出错，用于触发红框和抖动
+const errors = reactive({ username: false, password: false, nickname: false })
+
 const form = reactive({ username: '', password: '', nickname: '' })
 
 async function submit() {
   errorMsg.value = ''
-  if (!form.username || !form.password) {
-    errorMsg.value = '请填写用户名和密码'
+  // 每次提交前，先重置红框状态
+  errors.username = false
+  errors.password = false
+  errors.nickname = false
+
+  // 精确的表单空值校验
+  if (!form.username) {
+    errors.username = true
+    errorMsg.value = '哎呀，你还没输入用户名呢'
     return
   }
+
+  // 如果是注册模式，根据你的需求决定要不要强制校验昵称（你之前写的是可选，我就不强制校验了）
+  // 如果你想强制校验，可以取消注释下面这段：
+  // if (mode.value === 'register' && !form.nickname) {
+  //   errors.nickname = true; errorMsg.value = '起个响亮的昵称吧'; return;
+  // }
+
+  if (!form.password) {
+    errors.password = true
+    errorMsg.value = '密码也不能为空哦'
+    return
+  }
+
   loading.value = true
   try {
     if (mode.value === 'login') {
@@ -80,11 +125,16 @@ async function submit() {
     }
     router.push('/')
   } catch (e) {
-    errorMsg.value = e?.data?.message || '操作失败，请重试'
+    // 登录失败时，让两个框都变红
+    errors.username = true
+    errors.password = true
+    errorMsg.value = e?.data?.message || '账号或密码不太对劲，再试试？'
   } finally {
     loading.value = false
   }
 }
+
+
 
 // ==========================================
 // Three.js 克莱因蓝波浪背景逻辑
@@ -350,14 +400,36 @@ function renderThree() {
   background: rgba(0, 0, 0, 0.4);
   box-shadow: 0 0 0 4px rgba(250, 45, 72, 0.1);
 }
+
+/* 错误状态的红框 */
+.input-group input.error-shake {
+  border-color: #ff453a !important;
+  background: rgba(255, 69, 58, 0.1) !important;
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* 急促的左右抖动动画 */
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
 .input-group input::placeholder { color: rgba(255, 255, 255, 0.25); font-weight: 400; }
 
+/* 报错文字的入场动画 */
 .error-msg {
   color: #ff453a;
   font-size: 13px;
-  margin: 0;
+  margin: -8px 0 0 0;
   text-align: center;
-  font-weight: 500;
+  font-weight: 600;
+  animation: slideDown 0.3s ease forwards;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .submit-btn {

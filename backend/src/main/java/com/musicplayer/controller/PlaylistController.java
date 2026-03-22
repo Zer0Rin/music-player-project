@@ -15,6 +15,10 @@ import java.util.Map;
 
 import com.musicplayer.service.UserService;
 
+import com.musicplayer.model.User;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
+
 @RestController
 @RequestMapping("/api/playlists")
 public class PlaylistController {
@@ -30,8 +34,34 @@ public class PlaylistController {
 
 
     @GetMapping
-    public List<Playlist> listPlaylists(Authentication auth) {
-        return playlistService.getAllPlaylists(auth.getName());
+    public ResponseEntity<?> listPlaylists(Authentication auth) {
+        List<Playlist> playlists = playlistService.getAllPlaylists(auth.getName());
+        List<Map<String, Object>> result = playlists.stream().map(pl -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", pl.getId());
+            map.put("name", pl.getName());
+            map.put("description", pl.getDescription());
+            map.put("tags", pl.getTags());
+            map.put("coverImage", pl.getCoverImage());
+            map.put("coverSongId", pl.getCoverSongId());
+            map.put("system", pl.isSystem());
+            map.put("songIds", pl.getSongIds());
+            map.put("createdAt", pl.getCreatedAt());
+            map.put("updatedAt", pl.getUpdatedAt());
+            map.put("shareCode", pl.getShareCode());
+            map.put("shareCodeExpiry", pl.getShareCodeExpiry());
+            map.put("userId", pl.getUserId());
+            try {
+                User creator = userService.findById(pl.getUserId());
+                map.put("creatorName", creator.getNickname() != null ? creator.getNickname() : creator.getUsername());
+                map.put("creatorAvatarFile", creator.getAvatarFile() != null ? creator.getAvatarFile() : "");
+            } catch (Exception e) {
+                map.put("creatorName", "未知用户");
+                map.put("creatorAvatarFile", "");
+            }
+            return map;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/{id}")

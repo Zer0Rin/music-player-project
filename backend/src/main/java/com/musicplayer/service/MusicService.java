@@ -18,6 +18,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import com.musicplayer.model.Playlist;
+import com.musicplayer.repository.PlaylistRepository;
+
 @Service
 public class MusicService {
 
@@ -25,10 +28,11 @@ public class MusicService {
     private String musicDataPath;
 
     private final SongRepository songRepository;
+    private final PlaylistRepository playlistRepository;
 
-    public MusicService(SongRepository songRepository) {
+    public MusicService(SongRepository songRepository, PlaylistRepository playlistRepository) {
         this.songRepository = songRepository;
-        // 静默 JAudioTagger 的日志输出
+        this.playlistRepository = playlistRepository;
         Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     }
 
@@ -179,6 +183,7 @@ public class MusicService {
         song.setYear(year);
         song.setHasEmbeddedCover(hasEmbeddedCover);
         song.setHasEmbeddedLyrics(hasEmbeddedLyrics);
+        song.setCreatedAt(System.currentTimeMillis());
         return song;
     }
 
@@ -258,6 +263,14 @@ public class MusicService {
     /** 删除歌曲及其关联文件 */
     public void deleteSong(String id) {
         songRepository.findById(id).ifPresent(song -> {
+            // 从所有歌单中移除该歌曲
+            List<Playlist> playlists = playlistRepository.findAll();
+            for (Playlist pl : playlists) {
+                if (pl.getSongIds().remove(song.getId())) {
+                    playlistRepository.save(pl);
+                }
+            }
+
             try { Files.deleteIfExists(Paths.get(musicDataPath, "audio", song.getAudioFile())); } catch (Exception ignored) {}
             if (song.getCoverFile() != null) {
                 try { Files.deleteIfExists(Paths.get(musicDataPath, "covers", song.getCoverFile())); } catch (Exception ignored) {}

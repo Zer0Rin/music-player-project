@@ -9,6 +9,7 @@ let _audioCtx = null
 let _analyser = null
 let _sourceNode = null
 
+
 export function useAudioPlayer() {
   const store = usePlayerStore()
   let rafId = null
@@ -46,28 +47,56 @@ export function useAudioPlayer() {
     }
   }
 
-  function init() {
-    if (_audio) return
+    function init() {
+        if (_audio) {
+            startRAF()
+            return
+        }
 
-    _audio = new Audio()
-    _audio.volume = store.volume
+        _audio = new Audio()
+        _audio.crossOrigin = 'anonymous'
+        _audio.volume = store.volume
 
-    _audio.addEventListener('loadedmetadata', () => {
-      store.setDuration(_audio.duration)
-    })
+        _audio.addEventListener('loadedmetadata', () => {
+            store.setDuration(_audio.duration)
+        })
 
-    _audio.addEventListener('ended', () => {
-      store.isPlaying = false
-      handlePlayEnd()
-    })
+        _audio.addEventListener('ended', () => {
+            store.isPlaying = false
+            handlePlayEnd()
+        })
 
-    _audio.addEventListener('error', (e) => {
-      console.error('音频加载失败:', e)
-      store.isPlaying = false
-    })
+        _audio.addEventListener('error', (e) => {
+            console.error('音频加载失败:', e)
+            store.isPlaying = false
+        })
 
-    startRAF()
-  }
+        _audio.addEventListener('waiting', () => {
+            console.log('音频缓冲中...', _audio.currentTime)
+        })
+
+
+        _audio.addEventListener('suspend', () => {
+            console.log('音频挂起', _audio.currentTime)
+        })
+
+
+
+        _audio.addEventListener('stalled', () => {
+            console.log('音频停滞，尝试恢复', _audio.currentTime)
+            // 强制重新加载当前位置
+            const currentTime = _audio.currentTime
+            setTimeout(() => {
+                if (_audio && !_audio.paused && store.isPlaying) {
+                    _audio.load()
+                    _audio.currentTime = currentTime
+                    _audio.play().catch(console.error)
+                }
+            }, 200)
+        })
+
+        startRAF()
+    }
 
   /** 播放结束处理（根据播放模式） */
   function handlePlayEnd() {
@@ -82,45 +111,69 @@ export function useAudioPlayer() {
       }
   }
 
-
     function startRAF() {
-        function tick() {
+        if (rafId) clearInterval(rafId)
+        rafId = setInterval(() => {
             if (_audio) {
                 const t = _audio.currentTime
                 if (t !== store.currentTime) {
                     store.updateTime(t)
                 }
             }
-            rafId = requestAnimationFrame(tick)
+        }, 250) // 每250ms同步一次，足够流畅且不卡顿
+    }
+
+    function loadAndPlay(songId) {
+        if (!_audio) init()
+
+        // 先暂停当前播放
+        if (playPromise) {
+            playPromise.then(() => {
+                _audio.pause()
+                playPromise = null
+                _startLoad(songId)
+            }).catch(() => _startLoad(songId))
+        } else {
+            if (_audio.src) _audio.pause()
+            _startLoad(songId)
         }
-        rafId = requestAnimationFrame(tick)
     }
 
-  function loadAndPlay(songId) {
-    if (!_audio) init()
-    _audio.src = `/api/songs/${songId}/audio`
-    _audio.load()
-
-    // 恢复 AudioContext（浏览器要求用户交互后才能播放）
-    if (_audioCtx && _audioCtx.state === 'suspended') {
-      _audioCtx.resume()
+    function _startLoad(songId) {
+        const config = useRuntimeConfig()
+        _audio.src = `${config.public.apiBase}/api/songs/${songId}/audio`
+        _audio.load()
+        if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume()
+        setTimeout(() => {
+            playPromise = _audio.play().catch(e => {
+                if (e.name !== 'AbortError') console.error(e)
+            })
+        }, 500)
     }
 
-      setTimeout(() => {
-          _audio.play().catch(console.error)
-      }, 500)
+    let playPromise = null
 
-    _audio.play().catch(console.error)
-  }
+    function play() {
+        if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume()
+        if (_audio) {
+            playPromise = _audio.play().catch(e => {
+                if (e.name !== 'AbortError') console.error(e)
+            })
+        }
+    }
 
-  function play() {
-    if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume()
-    _audio?.play().catch(console.error)
-  }
-
-  function pause() {
-    _audio?.pause()
-  }
+    function pause() {
+        if (_audio) {
+            if (playPromise) {
+                playPromise.then(() => {
+                    _audio.pause()
+                    playPromise = null
+                }).catch(() => {})
+            } else {
+                _audio.pause()
+            }
+        }
+    }
 
   function seek(time) {
     if (_audio) {
@@ -147,8 +200,22 @@ export function useAudioPlayer() {
     if (rafId) cancelAnimationFrame(rafId)
   }
 
-  onMounted(() => init())
-  onUnmounted(() => destroy())
+    onMounted(() => init())
+    onUnmounted(() => {
+        if (rafId) clearInterval(rafId)
+        rafId = null
+    })
 
   return { seek, setVolume, getAudio, getAnalyser }
+}
+
+
+export function stopAudio() {
+    console.log('stopAudio called', _audio)
+    if (_audio) {
+        _audio.pause()
+        _audio.currentTime = 0
+        _audio.src = ''
+        _audio.load() // 强制清空缓冲
+    }
 }

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { stopAudio } from '~/composables/useAudioPlayer'
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -38,6 +39,13 @@ export const useAuthStore = defineStore('auth', {
         },
 
         logout() {
+            stopAudio()
+
+            const playerStore = usePlayerStore()
+            playerStore.isPlaying = false
+            playerStore.currentSong = null
+            playerStore.playlist = []
+
             this.token = null
             this.user = null
             localStorage.removeItem('token')

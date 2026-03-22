@@ -32,10 +32,19 @@
       <div class="playlist-info">
         <h1 class="playlist-title">{{ pageTitle }}</h1>
 
-        <div class="playlist-meta">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin&backgroundColor=b6e3f4" class="creator-avatar" />
-          <span class="creator-name">My Music</span>
-          <span class="create-time">创建于最近</span>
+        <div class="playlist-meta" v-if="plStore.activePlaylistId !== 'recent'">
+          <div class="creator-avatar-wrap">
+            <img
+                v-if="plStore.activePlaylist?.creatorAvatarFile"
+                :src="`/api/user/avatar/${plStore.activePlaylist.creatorAvatarFile}`"
+                class="creator-avatar"
+            />
+            <div v-else class="creator-avatar-placeholder">
+              {{ plStore.activePlaylist?.creatorName?.[0] || 'U' }}
+            </div>
+          </div>
+          <span class="creator-name">{{ plStore.activePlaylist?.creatorName || '未知用户' }}</span>
+          <span class="create-time">创建于 {{ formatDate(plStore.activePlaylist?.createdAt) }}</span>
           <span class="song-count-badge liquid-card">{{ filteredSongs.length }} 首</span>
         </div>
 
@@ -304,6 +313,19 @@ function playAll() {
 //歌单分享/分享码
 import ShareCodeModal from '~/components/playlist/ShareCodeModal.vue'
 const showShare = ref(false)
+
+
+// 歌单头像真实数据
+function formatDate(ts) {
+  if (!ts) return '未知'
+  return new Date(ts).toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' })
+}
+
+watch(() => plStore.activePlaylist, (val) => {
+  console.log('activePlaylist:', val)
+}, { immediate: true })
+
+
 
 </script>
 
@@ -822,5 +844,15 @@ const showShare = ref(false)
     margin-top: 8px;
   }
 }
+
+/* 歌单用户头像 生成 */
+.creator-avatar-placeholder {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(232, 63, 138, 0.83);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: white;
+}
+
 
 </style>

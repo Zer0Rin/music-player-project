@@ -121,7 +121,10 @@ async function previewImport() {
 async function doImport() {
   importing.value = true
   try {
-    await plStore.importByShareCode(importCode.value.trim())
+    const result = await plStore.importByShareCode(importCode.value.trim())
+    if (result?.id) {
+      plStore.setActivePlaylist(result.id)
+    }
     importMsg.value = '导入成功 ✓'
     importError.value = false
     preview.value = null

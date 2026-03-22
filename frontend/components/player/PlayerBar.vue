@@ -10,22 +10,40 @@
     </div>
 
     <div class="bar-inner">
-      <div class="bar-song liquid-card" @click="openLyrics">
-        <div class="bar-cover-wrap" v-if="store.currentSong">
-          <img :src="coverUrl(store.currentSong.id)" class="bar-cover" @error="e => e.target.style.visibility = 'hidden'" />
-          <div class="cover-expand-hint">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+      <div class="bar-left">
+
+        <div class="bar-song liquid-card" @click="openLyrics">
+          <div class="bar-cover-wrap" v-if="store.currentSong">
+            <img :src="coverUrl(store.currentSong.id)" class="bar-cover" @error="e => e.target.style.visibility = 'hidden'" />
+            <div class="cover-expand-hint">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+            </div>
+          </div>
+          <div v-if="store.currentSong" class="bar-meta">
+            <span class="bar-title">{{ store.currentSong.title }}</span>
+            <span class="bar-artist">{{ store.currentSong.artist }}</span>
+          </div>
+          <div v-else class="bar-meta">
+            <span class="bar-title empty">听见宇宙的声音</span>
           </div>
         </div>
-        <div v-if="store.currentSong" class="bar-meta">
-          <span class="bar-title">{{ store.currentSong.title }}</span>
-          <span class="bar-artist">{{ store.currentSong.artist }}</span>
-        </div>
-        <div v-else class="bar-meta">
-          <span class="bar-title empty">听见宇宙的声音</span>
-        </div>
-      </div>
 
+        <button v-if="store.currentSong"
+                class="bar-fav-btn"
+                :class="{ 'fav-active': plStore.isFavorite(store.currentSong?.id) }"
+                @click.stop="plStore.toggleFavorite(store.currentSong?.id)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+
+        <button class="ctrl mode-btn" @click="showComment = !showComment" title="评论">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M21 6.5A2.5 2.5 0 0 0 18.5 4h-13A2.5 2.5 0 0 0 3 6.5v8A2.5 2.5 0 0 0 5.5 17H7v3l4-3h7.5a2.5 2.5 0 0 0 2.5-2.5v-8z"/>
+          </svg>
+        </button>
+
+      </div> <CommentPanel :visible="showComment" @close="showComment = false" />
 
       <div class="bar-controls">
 
@@ -196,6 +214,14 @@ function getRatio(e) {
 }
 
 function openLyrics() { if (store.currentSong) store.openLyricView() }
+
+/* 播放器 ❤ */
+const plStore = usePlaylistStore()
+
+/* 评论 按钮*/
+import CommentPanel from '~/components/player/CommentPanel.vue'
+const showComment = ref(false)
+
 </script>
 
 <style scoped>
@@ -371,7 +397,21 @@ function openLyrics() { if (store.currentSong) store.openLyricView() }
 
 .bar-inner { display: flex; align-items: center; padding: 12px 32px; gap: 24px; height: 84px; }
 
-.bar-song { display: flex; align-items: center; gap: 16px; width: 280px; flex-shrink: 0; cursor: pointer; padding: 6px 12px 6px 6px; border-radius: 16px; border: none; }
+/* 左侧包裹层样式 */
+.bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* 控制歌曲信息、红心、评论按钮之间的间距 */
+  width: 280px; /* 和右侧的 bar-right 保持宽度对称 */
+  flex-shrink: 0;
+}
+
+.bar-song {
+  display: flex; align-items: center; gap: 16px;
+  flex: 1; /* 让歌曲信息自动占满左侧剩余空间 */
+  min-width: 0; /* 防止长标题撑破 flex 容器 */
+  cursor: pointer; padding: 6px 12px 6px 6px; border-radius: 16px; border: none;
+}
 .bar-song:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.2); transform: translateY(-2px); }
 
 .bar-cover-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
@@ -488,15 +528,82 @@ function openLyrics() { if (store.currentSong) store.openLyricView() }
 }
 
 @media (max-width: 768px) {
-  .player-bar { border-radius: 1.5rem 1.5rem 0 0; }
-  .bar-right { display: none; }
-  .bar-song { width: auto; max-width: 50%; padding: 4px; background: transparent !important; box-shadow: none !important; border-color: transparent !important;}
-  .bar-inner { padding: 10px 16px; height: 72px; gap: 12px; }
-  .bar-cover-wrap { width: 44px; height: 44px; }
-  .bar-title { font-size: 14px; }
-  .bar-artist { font-size: 12px; }
-  .ctrl.play { width: 46px; height: 46px; }
-  .bar-controls { gap: 16px; }
-  .bar-progress { left: 16px; right: 16px; }
+  /* 1. 调整播放栏整体外形和间距 */
+  .player-bar {
+    border-radius: 16px 16px 0 0;
+  }
+  .bar-inner {
+    padding: 8px 16px;
+    height: 64px; /* 稍微降低高度，显得更精致 */
+    justify-content: space-between; /* 💡 关键：让左侧歌曲和右侧按钮各分东西 */
+    gap: 12px;
+  }
+
+  /* 2. 彻底隐藏不需要的辅助组件 */
+  .bar-right,        /* 隐藏右侧音量和时间 */
+  .bar-progress,     /* 隐藏顶部的悬浮进度条（容易误触） */
+  .bar-fav-btn,      /* 隐藏红心 */
+  .bar-left > .mode-btn { /* 隐藏左侧的评论按钮 */
+    display: none !important;
+  }
+
+  /* 3. 左侧歌曲信息区：自动填满剩余空间，超出截断 */
+  .bar-left {
+    width: auto;
+    flex: 1; /* 撑开占据主导地位 */
+    min-width: 0; /* 防止长标题撑破 Flex 容器 */
+    gap: 0;
+  }
+  .bar-song {
+    width: 100%;
+    padding: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    gap: 10px;
+  }
+  .bar-cover-wrap {
+    width: 42px;
+    height: 42px;
+  }
+  .bar-title {
+    font-size: 14px;
+  }
+  .bar-artist {
+    font-size: 11px;
+  }
+
+  /* 4. 中间控制区（现移至最右侧）：只保留播放按钮 */
+  .bar-controls {
+    width: auto;
+    margin: 0; /* 去除原本的居中 margin: 0 auto */
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  /* 隐藏控制区内除了 .play 之外的所有按钮 (上一首、下一首、播放模式等) */
+  .bar-controls .ctrl:not(.play) {
+    display: none;
+  }
+
+  /* 稍微缩小播放按钮，适应手机比例 */
+  .ctrl.play {
+    width: 44px;
+    height: 44px;
+  }
 }
+
+
+/* 播放器 ❤*/
+.bar-fav-btn {
+  background: none; border: none;
+  color: var(--text-tertiary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px; border-radius: 8px;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.bar-fav-btn:hover { color: #ff2d55; transform: scale(1.1); }
+.bar-fav-btn.fav-active { color: #ff2d55; }
+
+
 </style>

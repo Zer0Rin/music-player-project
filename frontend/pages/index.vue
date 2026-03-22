@@ -128,14 +128,36 @@ onMounted(async () => {
 onUnmounted(() => { window.removeEventListener('keydown', onGlobalKey) })
 
 const displaySongs = computed(() => {
+  // 特殊视图不计算
+  const id = plStore.activePlaylistId
+  if (id === 'recent' || id === 'community' || id === 'profile') return []
+
   const playlist = plStore.activePlaylist
   if (!playlist) return allSongs.value
   return playlist.songIds.map(id => allSongs.value.find(s => s.id === id)).filter(Boolean)
 })
 
-watch(displaySongs, (songs) => {
-  store.setPlaylist(songs)
-}, { immediate: false })
+// 监听 activePlaylistId 的变化，主动切换播放列表
+watch(() => plStore.activePlaylistId, (newId) => {
+  // 1. 如果是社区或个人主页，不更新播放列表（保持正在播放的歌单继续播放）
+  if (newId === 'community' || newId === 'profile') {
+    return
+  }
+
+  // 2. 如果点击的是“最近”，把最近播放的歌曲列表扔给播放器！
+  if (newId === 'recent') {
+    if (store.recentSongs.length > 0) {
+      store.setPlaylist([...store.recentSongs])
+    }
+    return
+  }
+
+  // 3. 其他情况（全部歌曲 或 具体某个歌单）
+  const songs = displaySongs.value
+  if (songs && songs.length > 0) {
+    store.setPlaylist([...songs])
+  }
+}, { immediate: true }) // immediate: true 确保页面刚加载时也能初始化列表
 
 const pageTitle = computed(() => {
   const playlist = plStore.activePlaylist

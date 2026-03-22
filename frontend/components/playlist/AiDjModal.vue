@@ -107,6 +107,10 @@ async function generatePlaylist() {
       body: prompt.value.trim()
     })
 
+
+    console.log("🤖 DeepSeek 返回的原始数据:", resData);
+
+
     let parsedData;
 
     // 判断 $apiFetch 是否已经自动帮我们把 JSON 字符串解析成了对象

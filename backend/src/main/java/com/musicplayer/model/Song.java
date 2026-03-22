@@ -20,6 +20,10 @@ public class Song {
     private int duration;           // 秒
     private boolean hasEmbeddedCover;   // 音频文件内嵌封面
     private boolean hasEmbeddedLyrics;  // 音频文件内嵌歌词
+    private long createdAt;
+
+    public long getCreatedAt() { return createdAt; }
+    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
 
     public Song() {}
 

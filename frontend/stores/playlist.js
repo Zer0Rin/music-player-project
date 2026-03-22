@@ -46,6 +46,7 @@ export const usePlaylistStore = defineStore('playlist', {
             try {
                 const { $apiFetch } = useNuxtApp()
                 this.playlists = await $apiFetch('/api/playlists')
+                console.log('歌单数据:', this.playlists)
             } catch (e) {
                 console.error('加载歌单失败:', e)
             }
@@ -215,8 +216,8 @@ export const usePlaylistStore = defineStore('playlist', {
         async importByShareCode(code) {
             const { $apiFetch } = useNuxtApp()
             const pl = await $apiFetch(`/api/playlists/share/import/${code}`, { method: 'POST' })
-            this.playlists.push(pl)
-            return pl
+            await this.fetchPlaylists()
+            return pl  // 返回后端的原始歌单对象（有 id）
         },
     },
 })

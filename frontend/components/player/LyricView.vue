@@ -40,24 +40,35 @@
 
           <div class="bottom-controls-wrap">
             <div class="track-info" v-if="store.currentSong">
-              <div class="track-title">{{ store.currentSong.title }}</div>
-              <div class="track-artist">{{ store.currentSong.artist }}</div>
-              <button
-                  class="track-fav-btn"
-                  :class="{ 'fav-active': plStore.isFavorite(store.currentSong.id) }"
-                  @click="plStore.toggleFavorite(store.currentSong.id)"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                </svg>
-              </button>
+              <div class="track-meta">
+                <div class="track-title">{{ store.currentSong.title }}</div>
+                <div class="track-artist">{{ store.currentSong.artist }}</div>
+              </div>
+
+              <div class="track-actions">
+                <button
+                    class="track-fav-btn"
+                    :class="{ 'fav-active': plStore.isFavorite(store.currentSong.id) }"
+                    @click="plStore.toggleFavorite(store.currentSong.id)"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                </button>
+
+                <button class="track-comment-btn" @click="showComment = true">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M21 6.5A2.5 2.5 0 0 0 18.5 4h-13A2.5 2.5 0 0 0 3 6.5v8A2.5 2.5 0 0 0 5.5 17H7v3l4-3h7.5a2.5 2.5 0 0 0 2.5-2.5v-8z"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div class="progress-area">
-              <div class="progress-bar" ref="progRef" @mousedown="onProgDown" @touchstart.prevent="onProgTouchStart">
-                <div class="progress-bg" />
-                <div class="progress-fill" :style="{ width: displayProgress + '%' }" />
-                <div class="progress-dot" :style="{ left: displayProgress + '%' }" />
+              <div class="lyric-progress-bar" ref="progRef" @mousedown="onProgDown" @touchstart.prevent="onProgTouchStart">
+                <div class="lyric-progress-bg" />
+                <div class="lyric-progress-fill" :style="{ width: displayProgress + '%' }" />
+                <div class="lyric-progress-dot" :style="{ left: displayProgress + '%' }" />
               </div>
               <div class="progress-times">
                 <span>{{ dragging ? formatTime(dragTime) : store.formattedCurrentTime }}</span>
@@ -114,6 +125,7 @@
       </div>
     </div>
   </Transition>
+  <CommentPanel :visible="showComment" @close="showComment = false" />
 </template>
 
 <script setup>
@@ -121,6 +133,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import FluidBackground from './FluidBackground.vue'
 import AudioVisualizer from './AudioVisualizer.vue'
 import LyricsDisplay from '~/components/lyrics/LyricsDisplay.vue'
+// 引入评论面板
+import CommentPanel from '~/components/player/CommentPanel.vue'
 
 // 假设这些是你原本定义的 composables
 const store = usePlayerStore()
@@ -128,9 +142,10 @@ const plStore = usePlaylistStore()
 const { coverUrl } = useCoverUrl()
 const emit = defineEmits(['seek', 'volume'])
 
-// 💡 新增：屏幕尺寸检测与翻转状态
+// 屏幕尺寸检测与翻转状态
 const isMobile = ref(false)
 const isFlipped = ref(false) // 移动端控制封面和歌词的切换
+const showComment = ref(false)
 
 function toggleFlip() {
   if (isMobile.value) {
@@ -200,7 +215,29 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
 
 <style scoped>
 /* 原有的全局和基础样式保持不变 */
-.lyric-overlay { position: fixed; inset: 0; z-index: 1000; background: #000; overflow: hidden; }
+.lyric-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: #000;
+  overflow: hidden;
+
+  /* 隔离外部的白天模式影响 */
+  color-scheme: dark; /* 强制浏览器原生元素（如滚动条）使用暗色主题 */
+  color: #ffffff;     /* 兜底：强制基础字体颜色为纯白 */
+
+  /* 强制重置 CSS 变量：
+     即使外面是白天模式，只要进入这个容器，所有的子组件 (包括 LyricsDisplay)
+     读取到的变量都会强制变成黑夜状态下的颜色！*/
+  --text-primary: #ffffff !important;
+  --text-secondary: rgba(255, 255, 255, 0.7) !important;
+  --text-tertiary: rgba(255, 255, 255, 0.4) !important;
+  /* 如果你的白天模式修改了强调色（比如爱心变色了），在这里也强制重置回来 */
+  --accent: #fa2d48 !important;
+}
+
+
+
 .mode-btn { background: transparent !important; border: none !important; outline: none; box-shadow: none !important; color: rgba(255, 255, 255, 0.6); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 50%; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .mode-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.1) !important; transform: scale(1.15); }
 .close-btn { position: absolute; top: 20px; left: 24px; z-index: 50; background: transparent; border: none; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-fast); }
@@ -305,183 +342,219 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
 .fade-flip-leave-to { opacity: 0; transform: scale(1.05); }
 
 
+
+
 /* =========================================
-   📱 移动端沉浸式单列布局 (Apple Music 风格)
+   🎵 歌曲信息与操作区 (PC端：文字绝对正中，按钮悬浮靠右)
    ========================================= */
-@media (max-width: 768px) {
 
-  /* 💡 修复1：加上 box-sizing，并且必须使用 dvh 避免浏览器地址栏干扰 */
-  .lyric-content {
-    box-sizing: border-box; /* 极度重要！确保 padding 不会撑破高度 */
-    padding: 50px 24px 24px; /* 稍微压缩上下留白，给底部让路 */
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    height: 100dvh;
-    overflow: hidden; /* 严禁出现整体滚动条 */
-  }
-
-  .left-panel {
-    margin-left: 0;
-    width: 100%;
-    height: 100%;
-    flex: 1;
-    gap: 0;
-    justify-content: flex-start;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* 取消写死的 55vh，让它具有弹性 */
-  .interactive-area {
-    width: 100%;
-    flex: 1; /* 占据屏幕中部的所有剩余空间 */
-    min-height: 0; /* 允许它被压缩，这句很关键 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px; /* 压缩底部间距 */
-  }
-
-  /* 移动端封面：保持你完美的大圆角方块 */
-  .cover-container {
-    width: min(85vw, 45dvh, 360px);
-    aspect-ratio: 1;
-    border-radius: 12px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-    margin: 0 auto;
-  }
-
-  .mobile-lyrics-container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
-    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
-  }
-
-  /* 底部控制台保持在屏幕内 */
-  .bottom-controls-wrap {
-    width: 100%;
-    gap: 12px; /* 缩小元素之间的空隙 */
-    margin-top: auto;
-    flex-shrink: 0; /* 绝对不能被压缩 */
-  }
-
-  /* 左对齐的歌曲信息 */
-  .track-info {
-    width: 100%;
-    text-align: left;
-    padding: 0; /* 去掉多余的 padding */
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .track-title {
-    font-size: 22px; /* 稍微缩小一点字号，更加精致 */
-    font-weight: 700;
-    line-height: 1.2;
-    padding-right: 40px; /* 给右边的爱心留出空间，防止歌名太长盖住爱心 */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .track-artist {
-    font-size: 16px;
-    margin-top: 2px;
-    line-height: 1.2;
-    opacity: 0.8;
-  }
-
-  /* 修正爱心按钮的垂直居中 */
-  .track-fav-btn {
-    position: absolute;
-    right: 0;
-    top: 50%; /* 垂直居中 */
-    transform: translateY(-50%);
-  }
-  /* 修复 hover 时的 transform 覆盖问题 */
-  .track-fav-btn:hover {
-    transform: translateY(-50%) scale(1.15);
-  }
-
-  .progress-area, .controls-row, .volume-row { width: 100%; max-width: none; }
-
-  /* 按钮尺寸微调：为了保住底部，稍微缩小播放器按钮 */
-  .play-btn { width: 56px; height: 56px; }
-  .ctrl-main { gap: 24px; }
-
-  .visualizer {
-    display: flex; /* 解除隐藏，允许显示 */
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-
-    /* 核心限制：给一个固定的矮高度，绝不挤压底部控制台 */
-    height: 36px;
-    margin: 8px 0 16px; /* 调整上下间距，与上方封面和下方文字保持呼吸感 */
-
-    flex-shrink: 0; /* 绝对不被压缩，保持波浪的完整性 */
-    opacity: 0.8; /* 稍微透明一点，作为高级点缀 */
-  }
-
-  /* 如果需要强制波浪柱里的 Canvas 适配手机宽度 */
-  .visualizer :deep(canvas) {
-    max-width: 80%; /* 避免波浪太宽顶到屏幕边缘 */
-    height: 100% !important; /* 强制填满我们设定的 36px 高度 */
-  }
-
-  .close-btn {
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 44px;
-    height: 16px;
-    background: transparent;
-    backdrop-filter: none;
-  }
-  .close-btn svg { display: none; }
-  .close-btn::after {
-    content: '';
-    display: block;
-    width: 36px;
-    height: 5px;
-    background: rgba(255,255,255,0.4);
-    border-radius: 3px;
-  }
+/* 1. 外层容器：相对定位，作为按钮的参照物 */
+.track-info {
+  position: relative;
+  display: flex !important;
+  justify-content: center; /* 整体居中 */
+  align-items: center;     /* 垂直居中 */
+  width: min(420px, 95%);
+  margin: 0 auto;
+  min-height: 70px; /* 给定一个最小高度，保证布局稳定 */
 }
 
-/* =========================================
-   全局通用的爱心按钮样式 (放在媒体查询外部)
-   ========================================= */
-.track-fav-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
+/* 2. 文字区域：左右对称防撞，保证视觉绝对居中 */
+.track-meta {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  /* 绝对定位，把❤强行“钉”在容器的最右侧垂直居中位置 */
-  position: absolute;
-  right: 0;           /* 靠最右 */
-  top: 70%;           /* 距离顶部 50% */
-  transform: translateY(-50%); /* 完美垂直居中修正 */
+  text-align: center;
+  width: 100%;
+
+  /* 💡 罪魁祸首修复：左右对称 Padding！
+     左侧和右侧各留出 90px 的安全区。
+     这样不仅防止了文字撞到右侧按钮，还能保证文字的物理中心始终在屏幕绝对中央！ */
+  padding: 0 90px;
+  box-sizing: border-box;
 }
 
-.track-fav-btn:hover {
-  color: rgba(255, 255, 255, 0.7);
-  transform: translateY(-50%) scale(1.15);
+.track-title,
+.track-artist {
+  width: 100%; /* 填满安全区，超长自动截断 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-title {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.track-artist {
+  font-size: 21px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 5px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 3. 右侧按钮区 (❤ 和 💬)：绝对定位，占用全高自动垂直居中 */
+.track-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  display: flex;
+  align-items: center; /* 借用 flex 实现完美的垂直居中，抛弃 translate */
+  gap: 8px;
+}
+
+/* 按钮基础样式与悬浮反馈 */
+.track-fav-btn,
+.track-comment-btn {
+  background: none; border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer; padding: 8px;
+  border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.track-fav-btn:hover,
+.track-comment-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.15) translateY(-2px);
 }
 
 .track-fav-btn.fav-active {
   color: var(--accent);
   filter: drop-shadow(0 0 8px rgba(250, 45, 72, 0.5));
 }
+
+
+/* =========================================
+   📱 移动端沉浸式单列布局 (Apple Music 风格)
+   ========================================= */
+@media (max-width: 768px) {
+  .lyric-content {
+    box-sizing: border-box;
+    padding: 50px 24px 24px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .left-panel {
+    margin-left: 0; width: 100%; height: 100%; flex: 1; gap: 0;
+    justify-content: flex-start; display: flex; flex-direction: column;
+  }
+
+  .interactive-area {
+    width: 100%; flex: 1; min-height: 0; display: flex;
+    align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+
+  .cover-container {
+    width: min(85vw, 45dvh, 360px); aspect-ratio: 1; border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); margin: 0 auto;
+  }
+
+  .mobile-lyrics-container {
+    width: 100%; height: 100%; overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  }
+
+  .bottom-controls-wrap {
+    width: 100%; gap: 12px; margin-top: auto; flex-shrink: 0;
+  }
+
+  /* 💡 修复移动端歌曲信息区布局：文字在左，按钮绝对定位在右 */
+  .track-info {
+    display: flex !important;
+    text-align: left;
+    width: 100%; max-width: none; padding: 0;
+    position: relative;
+    flex-direction: column !important; /* 手机端恢复纵向结构 */
+    justify-content: center;
+    align-items: flex-start !important; /* 靠左对齐 */
+  }
+
+  .track-meta {
+    text-align: left;
+    /* 手机端由于文字是靠左的，所以左边不需要防撞墙，只保留右边防撞即可 */
+    padding-left: 0 !important;
+    padding-right: 90px;
+    align-items: flex-start !important;
+  }
+
+  .track-title {
+    font-size: 22px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding-right: 0;
+  }
+  .track-artist {
+    font-size: 16px; margin-top: 2px;
+  }
+
+  /* 💡 移动端核心定位：让按钮组整体绝对定位，垂直居中釘在最右侧 */
+  .track-actions {
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%); /* 整体垂直居中 */
+    justify-content: flex-end;
+    gap: 10px; /* 控制手机上 ❤ 和 💬 的间距 */
+    margin-top: 0;
+  }
+
+  /* 确保按钮不干扰外层的布局 */
+  .track-fav-btn, .track-comment-btn {
+    padding: 6px;
+    position: static; /* 撤销原来的绝对定位 */
+    transform: none;
+  }
+  .track-fav-btn:hover, .track-comment-btn:hover {
+    transform: scale(1.15); /* 手机端 hover 只保留轻微缩放，取消 translateY */
+  }
+
+  /* --- 其他底部控制台适配 --- */
+  .progress-area, .controls-row, .volume-row { width: 100%; max-width: none; }
+  .play-btn { width: 56px; height: 56px; }
+  .ctrl-main { gap: 24px; }
+
+  .visualizer {
+    display: flex; align-items: center; justify-content: center; width: 100%;
+    height: 36px; margin: 8px 0 16px; flex-shrink: 0; opacity: 0.8;
+  }
+  .visualizer :deep(canvas) {
+    max-width: 80%; height: 100% !important;
+  }
+
+  .close-btn {
+    top: 12px; left: 50%; transform: translateX(-50%);
+    width: 44px; height: 16px; background: transparent; backdrop-filter: none;
+  }
+  .close-btn svg { display: none; }
+  .close-btn::after {
+    content: ''; display: block; width: 36px; height: 5px;
+    background: rgba(255,255,255,0.4); border-radius: 3px;
+  }
+}
+
+</style>
+
+<style>
+/* 播放进度条强制锁定纯白透明系 */
+.lyric-progress-bar { position: relative; height: 28px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+.lyric-progress-bg { position: absolute; left: 0; right: 0; height: 5px; background: rgba(255, 255, 255, 0.15); border-radius: 3px; top: 50%; transform: translateY(-50%); transition: height 0.15s ease; }
+.lyric-progress-fill { position: absolute; left: 0; height: 5px; background: rgba(255, 255, 255, 0.85); border-radius: 3px; top: 50%; transform: translateY(-50%); transition: height 0.15s ease; }
+.lyric-progress-dot { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #ffffff; transform: translate(-50%, -50%) scale(0); transition: transform 0.15s ease; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); z-index: 2; }
+
+/* 悬浮互动效果 */
+.lyric-progress-bar:hover .lyric-progress-dot, .lyric-progress-bar:active .lyric-progress-dot { transform: translate(-50%, -50%) scale(1); }
+.lyric-progress-bar:hover .lyric-progress-bg, .lyric-progress-bar:active .lyric-progress-bg,
+.lyric-progress-bar:hover .lyric-progress-fill, .lyric-progress-bar:active .lyric-progress-fill { height: 7px; }
 </style>

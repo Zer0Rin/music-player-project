@@ -43,9 +43,16 @@ export default defineNuxtConfig({
       '/api': {
         target: 'http://localhost:8080/api',
         changeOrigin: true,
+        timeout: 0,
       },
     },
   },
+
+    runtimeConfig: {
+        public: {
+            apiBase: 'http://localhost:8080'
+        }
+    },
 
 
   compatibilityDate: '2024-04-03',
