@@ -102,9 +102,55 @@
               </div>
 
               <div class="ctrl-side">
-                <button class="fn-btn" title="更多">
+                <button class="fn-btn" title="歌曲信息" @click="showSongInfo = true">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                 </button>
+
+                <!-- 歌曲详情小窗 -->
+                <Transition name="info-pop">
+                  <div v-if="showSongInfo" class="song-info-popup" @click.self="showSongInfo = false">
+                    <div class="song-info-panel">
+                      <div class="info-header">
+                        <span class="info-title">歌曲信息</span>
+                        <button class="info-close" @click="showSongInfo = false">
+                          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="info-cover">
+                        <img v-if="store.currentSong" :src="coverUrl(store.currentSong.id)" class="info-cover-img" />
+                      </div>
+                      <div class="info-rows" v-if="store.currentSong">
+                        <div class="info-row">
+                          <span class="info-label">标题</span>
+                          <span class="info-value">{{ store.currentSong.title || '—' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">艺术家</span>
+                          <span class="info-value">{{ store.currentSong.artist || '—' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">专辑</span>
+                          <span class="info-value">{{ store.currentSong.album || '—' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">流派</span>
+                          <span class="info-value">{{ store.currentSong.genre || '—' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">年份</span>
+                          <span class="info-value">{{ store.currentSong.year || '—' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">时长</span>
+                          <span class="info-value">{{ store.formattedDuration }}</span>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
               </div>
             </div>
 
@@ -146,6 +192,9 @@ const emit = defineEmits(['seek', 'volume'])
 const isMobile = ref(false)
 const isFlipped = ref(false) // 移动端控制封面和歌词的切换
 const showComment = ref(false)
+
+// 设置/详细信息
+const showSongInfo = ref(false)
 
 function toggleFlip() {
   if (isMobile.value) {
@@ -543,6 +592,78 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
     background: rgba(255,255,255,0.4); border-radius: 3px;
   }
 }
+
+
+/* 设置/详细信息 */
+.song-info-popup {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+}
+
+.song-info-panel {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(20,20,20,0.95);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.info-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+}
+.info-close {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: rgba(255,255,255,0.6);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.info-close:hover { background: rgba(255,255,255,0.2); color: white; }
+
+.info-cover { width: 80px; height: 80px; border-radius: 10px; overflow: hidden; margin: 0 auto; }
+.info-cover-img { width: 100%; height: 100%; object-fit: cover; }
+
+.info-rows { display: flex; flex-direction: column; gap: 0; }
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  gap: 16px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { font-size: 13px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+.info-value { font-size: 13px; color: white; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.file-name { font-size: 11px; font-family: monospace; color: rgba(255,255,255,0.6); }
+.info-badge { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.badge-ok { background: rgba(74,222,128,0.2); color: #4ade80; }
+.badge-no { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+
+.info-pop-enter-active, .info-pop-leave-active { transition: all 0.3s ease; }
+.info-pop-enter-from, .info-pop-leave-to { opacity: 0; transform: translateY(20px); }
+
 
 </style>
 

@@ -1,40 +1,38 @@
 package com.musicplayer.controller;
 
 import com.musicplayer.model.Song;
+import com.musicplayer.service.HotScoreService;
 import com.musicplayer.service.MusicService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.List;
-
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-
-
 
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
 
     private final MusicService musicService;
+    private final HotScoreService hotScoreService;
 
-    public SongController(MusicService musicService) {
+    public SongController(MusicService musicService, HotScoreService hotScoreService) {
         this.musicService = musicService;
+        this.hotScoreService = hotScoreService;
     }
 
-    /** 歌曲列表 */
     @GetMapping
     public List<Song> listSongs() {
         return musicService.getAllSongs();
     }
 
-    /** 歌曲详情 */
     @GetMapping("/{id}")
     public ResponseEntity<Song> getSong(@PathVariable String id) {
         return musicService.getSongById(id)
@@ -42,7 +40,6 @@ public class SongController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 音频流（依赖 Spring Boot 内置的 Resource 处理，完美支持 Range 请求与大文件） */
     @GetMapping("/{id}/audio")
     public ResponseEntity<Resource> getAudio(@PathVariable String id) {
         return musicService.getSongById(id)
@@ -50,18 +47,15 @@ public class SongController {
                 .map(song -> {
                     Path path = musicService.getAudioPath(song.getAudioFile());
                     if (!Files.exists(path)) return ResponseEntity.notFound().<Resource>build();
-
                     Resource resource = new FileSystemResource(path);
                     String ext = song.getAudioFile().substring(song.getAudioFile().lastIndexOf('.') + 1).toLowerCase();
                     String mimeType = switch (ext) {
                         case "flac" -> "audio/flac";
                         case "wav"  -> "audio/wav";
                         case "ogg"  -> "audio/ogg";
-                        case "m4a"  -> "audio/mp4"; // 顺手帮你补上 m4a 格式的支持
+                        case "m4a"  -> "audio/mp4";
                         default     -> "audio/mpeg";
                     };
-
-                    // 直接返回资源，Spring 会自动处理 bytes=xx-xx 的切片请求并返回 206 状态码
                     return ResponseEntity.ok()
                             .contentType(MediaType.parseMediaType(mimeType))
                             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
@@ -70,7 +64,6 @@ public class SongController {
                 .orElse(ResponseEntity.notFound().<Resource>build());
     }
 
-    /** 歌词内容（返回纯文本 LRC） */
     @GetMapping("/{id}/lyrics")
     public ResponseEntity<String> getLyrics(@PathVariable String id) {
         return musicService.getSongById(id)
@@ -78,7 +71,6 @@ public class SongController {
                 .map(song -> {
                     Path path = musicService.getLyricsPath(song.getLyricsFile());
                     try {
-                        // LRC 文件可能是 UTF-8 或 GBK 编码
                         String content;
                         try {
                             content = Files.readString(path);
@@ -95,7 +87,6 @@ public class SongController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 专辑封面 */
     @GetMapping("/{id}/cover")
     public ResponseEntity<Resource> getCover(@PathVariable String id) {
         return musicService.getSongById(id)
@@ -103,14 +94,12 @@ public class SongController {
                 .map(song -> {
                     Path path = musicService.getCoverPath(song.getCoverFile());
                     if (!Files.exists(path)) return ResponseEntity.notFound().<Resource>build();
-
                     String ext = song.getCoverFile().substring(song.getCoverFile().lastIndexOf('.') + 1).toLowerCase();
                     MediaType mediaType = switch (ext) {
                         case "png" -> MediaType.IMAGE_PNG;
                         case "webp" -> MediaType.parseMediaType("image/webp");
                         default -> MediaType.IMAGE_JPEG;
                     };
-
                     Resource resource = new FileSystemResource(path);
                     String etag = "\"" + path.toFile().lastModified() + "-" + path.toFile().length() + "\"";
                     return ResponseEntity.ok()
@@ -122,7 +111,6 @@ public class SongController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** 上传音频文件（仅 ADMIN） */
     @PostMapping("/upload")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> uploadSongs(@RequestParam("files") MultipartFile[] files) {
@@ -145,7 +133,6 @@ public class SongController {
         return ResponseEntity.ok(Map.of("results", results));
     }
 
-    /** 删除歌曲（仅 ADMIN） */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteSong(@PathVariable String id) {
@@ -153,15 +140,6 @@ public class SongController {
         return ResponseEntity.ok().build();
     }
 
-    private boolean isAudioFile(String filename) {
-        if (filename == null) return false;
-        String lower = filename.toLowerCase();
-        return lower.endsWith(".mp3") || lower.endsWith(".flac") ||
-                lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".m4a");
-    }
-
-
-    /** 修改歌曲信息（仅 ADMIN） */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateSong(@PathVariable String id,
@@ -176,7 +154,6 @@ public class SongController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    /** 替换封面图片（仅 ADMIN） */
     @PostMapping("/{id}/cover/upload")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> uploadCover(@PathVariable String id,
@@ -185,8 +162,7 @@ public class SongController {
             try {
                 Path coverDir = musicService.getCoverDir();
                 Files.createDirectories(coverDir);
-                String ext = file.getOriginalFilename() != null &&
-                        file.getOriginalFilename().contains(".")
+                String ext = file.getOriginalFilename() != null && file.getOriginalFilename().contains(".")
                         ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.'))
                         : ".jpg";
                 String baseName = song.getAudioFile().substring(0, song.getAudioFile().lastIndexOf('.'));
@@ -201,7 +177,6 @@ public class SongController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    /** 替换歌词文件（仅 ADMIN） */
     @PostMapping("/{id}/lyrics/upload")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> uploadLyrics(@PathVariable String id,
@@ -222,6 +197,26 @@ public class SongController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/hot")
+    public List<Song> getHotSongs() {
+        return musicService.getAllSongs().stream()
+                .filter(s -> s.getHotScore() > 0)
+                .sorted((a, b) -> b.getHotScore() - a.getHotScore())
+                .limit(20)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @PostMapping("/hot/refresh")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> refreshHot() {
+        hotScoreService.updateNow();
+        return ResponseEntity.ok(Map.of("message", "热度刷新完成"));
+    }
+
+    private boolean isAudioFile(String filename) {
+        if (filename == null) return false;
+        String lower = filename.toLowerCase();
+        return lower.endsWith(".mp3") || lower.endsWith(".flac") ||
+                lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".m4a");
+    }
 }
-
-

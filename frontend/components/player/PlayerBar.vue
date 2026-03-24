@@ -37,7 +37,7 @@
           </svg>
         </button>
 
-        <button class="ctrl mode-btn" @click="showComment = !showComment" title="评论">
+        <button v-if="store.currentSong" class="ctrl mode-btn" @click="showComment = !showComment" title="评论">
           <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
             <path d="M21 6.5A2.5 2.5 0 0 0 18.5 4h-13A2.5 2.5 0 0 0 3 6.5v8A2.5 2.5 0 0 0 5.5 17H7v3l4-3h7.5a2.5 2.5 0 0 0 2.5-2.5v-8z"/>
           </svg>
@@ -103,16 +103,24 @@
       </div>
 
       <div class="bar-right">
+        <button v-if="store.currentSong" class="ctrl mode-btn" @click="togglePip" :title="isPip ? '退出画中画' : '画中画'">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>
+          </svg>
+        </button>
         <span class="bar-time">{{ store.formattedCurrentTime }} / {{ store.formattedDuration }}</span>
         <div class="volume-group liquid-card">
           <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8.5v7a4.5 4.5 0 0 0 2.5-3.5z"/></svg>
 
-          <div class="vol-slider-wrapper">
+          <div class="vol-slider-wrapper"
+               ref="volWrapperRef"
+               @mousedown="onVolMouseDown"
+               @touchstart.prevent="onVolTouchStart"
+               @click.stop>
             <div class="vol-progress-bg"></div>
             <div class="vol-progress-fill" :style="{ width: (store.volume * 100) + '%' }">
               <div class="vol-progress-glow"></div>
             </div>
-            <input type="range" min="0" max="1" step="0.01" :value="store.volume" class="vol-slider-input" @input="e => emit('volume', parseFloat(e.target.value))" />
           </div>
 
         </div>
@@ -221,6 +229,85 @@ const plStore = usePlaylistStore()
 /* 评论 按钮*/
 import CommentPanel from '~/components/player/CommentPanel.vue'
 const showComment = ref(false)
+
+/* 小窗播放 */
+import { usePictureInPicture } from '~/composables/usePictureInPicture'
+const { togglePip, isPip } = usePictureInPicture()
+
+/* 竖直 音量调节 */
+const volWrapperRef = ref(null)
+const isVolDragging = ref(false)
+
+function onVolMouseDown(e) {
+  isVolDragging.value = true
+  updateVolFromMouse(e)
+  window.addEventListener('mousemove', onVolMouseMove)
+  window.addEventListener('mouseup', onVolMouseUp)
+}
+
+function onVolMouseMove(e) {
+  if (isVolDragging.value) updateVolFromMouse(e)
+}
+
+function onVolMouseUp() {
+  isVolDragging.value = false
+  window.removeEventListener('mousemove', onVolMouseMove)
+  window.removeEventListener('mouseup', onVolMouseUp)
+}
+
+function updateVolFromMouse(e) {
+  const el = volWrapperRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+
+  let ratio
+  if (window.innerWidth <= 1024) {
+    // 竖直模式：视觉上下对应实际的 Y 轴，但旋转后上方=小值，需要反转
+    ratio = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+  } else {
+    // 横向模式：正常左右
+    ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  }
+  emit('volume', ratio)
+}
+
+/* 竖直 音量调节 触屏 */
+function onVolTouchStart(e) {
+  isVolDragging.value = true
+  updateVolFromTouch(e)
+  window.addEventListener('touchmove', onVolTouchMove, { passive: false })
+  window.addEventListener('touchend', onVolTouchEnd)
+}
+
+function onVolTouchMove(e) {
+  e.preventDefault()
+  if (isVolDragging.value) updateVolFromTouch(e)
+}
+
+function onVolTouchEnd() {
+  isVolDragging.value = false
+  window.removeEventListener('touchmove', onVolTouchMove)
+  window.removeEventListener('touchend', onVolTouchEnd)
+}
+
+function updateVolFromTouch(e) {
+  const el = volWrapperRef.value
+  if (!el) return
+  const touch = e.touches[0]
+  const rect = el.getBoundingClientRect()
+
+  let ratio
+  if (window.innerWidth <= 1024) {
+    ratio = 1 - Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height))
+  } else {
+    ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width))
+  }
+  emit('volume', ratio)
+}
+
+
+
+
 
 </script>
 
@@ -402,7 +489,7 @@ const showComment = ref(false)
   display: flex;
   align-items: center;
   gap: 12px; /* 控制歌曲信息、红心、评论按钮之间的间距 */
-  width: 280px; /* 和右侧的 bar-right 保持宽度对称 */
+  width: 320px; /* 和右侧的 bar-right 保持宽度对称 */
   flex-shrink: 0;
 }
 
@@ -485,8 +572,27 @@ const showComment = ref(false)
 .play-glow { position: absolute; inset: -4px; border-radius: 50%; background: var(--accent); opacity: 0.4; filter: blur(8px); z-index: -1; animation: pulse 2s infinite alternate; }
 @keyframes pulse { 0% { transform: scale(0.9); opacity: 0.3; } 100% { transform: scale(1.1); opacity: 0.6; } }
 
-.bar-right { display: flex; align-items: center; gap: 20px; width: 280px; justify-content: flex-end; flex-shrink: 0; }
-.bar-time { font-size: 13px; color: var(--text-primary); font-weight: 600; font-family: monospace; letter-spacing: 0.05em; opacity: 0.8; }
+.bar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 320px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 50;
+}
+/* 保时间的显示区域绝不被压缩断行 */
+.bar-time {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  white-space: nowrap; /* 绝对不许换行 */
+  flex-shrink: 0;      /* 绝对不许被挤压 */
+}
 .volume-group { display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 20px; border: none; }
 .vol-icon { color: var(--text-primary); opacity: 0.8; }
 
@@ -498,20 +604,39 @@ const showComment = ref(false)
 .vol-slider-wrapper {
   position: relative;
   width: 90px;
-  height: 20px; /* 增加热区高度，方便鼠标/手指交互 */
+  height: 20px;
   display: flex;
   align-items: center;
   cursor: pointer;
+
 }
 
 .vol-progress-bg { position: absolute; left: 0; right: 0; height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; transition: height 0.2s ease; }
 .vol-progress-fill { position: absolute; left: 0; height: 4px; background: linear-gradient(90deg, #fa2d48, #ff7e5f); border-radius: 2px; transition: width 0.1s linear, height 0.2s ease; box-shadow: 0 0 8px rgba(250, 45, 72, 0.5); pointer-events: none; }
-.vol-progress-glow { content: ''; position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px #fff, 0 0 20px var(--accent); opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; }
+.vol-progress-glow {
+  content: '';
+  position: absolute;
+  right: -6px; /* 让圆心对准进度条边缘 */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* 增加物理阴影，显得立体 */
+  opacity: 1; /* 强制永远显示！ */
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none; /* 让鼠标事件穿透给底层隐藏的 input */
+}
+
 
 /* Hover 联动变粗及显示发光小球 */
 .vol-slider-wrapper:hover .vol-progress-bg,
 .vol-slider-wrapper:hover .vol-progress-fill { height: 6px; }
-.vol-slider-wrapper:hover .vol-progress-glow { opacity: 1; transform: translateY(-50%) scale(1.2); }
+/* Hover 时小球放大，给予手感反馈 */
+.vol-slider-wrapper:hover .vol-progress-glow {
+  transform: translateY(-50%) scale(1.3);
+}
 
 /* 将原生 range input 设为完全透明并置于最顶层，用于捕捉事件 */
 .vol-slider-input {
@@ -525,8 +650,92 @@ const showComment = ref(false)
   z-index: 2;
   -webkit-appearance: none;
   appearance: none;
+  touch-action: none;
 }
 
+
+/* =========================================
+   平板/窄屏适配 (< 1024px)：释放横向空间，音量改竖向弹出
+   ========================================= */
+@media (max-width: 1024px) {
+  /* 1. 缩小两翼占地宽度，给中间的播放控制区让出救命空间 */
+  .bar-left, .bar-right {
+    width: 220px;
+    gap: 12px;
+  }
+  .bar-time {
+    font-size: 12px;
+  }
+
+  /* 2. 把喇叭图标变成触发器 */
+  .volume-group {
+    position: relative;
+    padding: 6px;
+    cursor: pointer;
+  }
+
+  /* 3. 音量条化身悬浮面板：直接 -90度 旋转魔法！ */
+  .vol-slider-wrapper {
+    position: absolute;
+    bottom: calc(100% + 15px); /* 悬浮在图标正上方 */
+    left: 50%;
+    margin-left: -55px; /* (面板宽度 110px / 2，保证居中) */
+
+    /* 把横向的条直接旋转站立起来 */
+    transform-origin: center center;
+    transform: rotate(-90deg) scale(0.8);
+
+    /* 弹出面板的高级 UI 质感 */
+    width: 110px; /* 旋转后，这就是竖向的高度 */
+    height: 36px; /* 旋转后，这就是竖向的宽度 */
+    background: rgba(30, 30, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    padding: 0 12px;
+
+    /* 默认隐藏状态 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1000;
+  }
+
+  /* 白天模式面板反色 */
+  :global(.light-mode) .vol-slider-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  /* 4. 鼠标悬浮喇叭时，弹出竖向音量条 */
+  .volume-group:hover .vol-slider-wrapper {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: rotate(-90deg) scale(1); /* 恢复比例并弹出 */
+  }
+
+  /* 5. 隐形桥梁 (极其关键的体验细节)
+     防止鼠标离开图标往上移去抓滑块时，穿过缝隙导致 Hover 断裂。
+     注意：由于面板旋转了 -90度，视觉上的“下方缝隙”其实是 CSS 里的“左侧 (left)” */
+  .vol-slider-wrapper::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 0;
+    width: 20px;
+    height: 100%;
+    background: transparent;
+  }
+}
+
+
+
+
+/* 手机端 */
 @media (max-width: 768px) {
   /* 1. 调整播放栏整体外形和间距 */
   .player-bar {
@@ -535,7 +744,7 @@ const showComment = ref(false)
   .bar-inner {
     padding: 8px 16px;
     height: 64px; /* 稍微降低高度，显得更精致 */
-    justify-content: space-between; /* 💡 关键：让左侧歌曲和右侧按钮各分东西 */
+    justify-content: space-between; /* 关键：让左侧歌曲和右侧按钮各分东西 */
     gap: 12px;
   }
 

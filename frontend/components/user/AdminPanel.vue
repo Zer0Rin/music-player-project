@@ -14,6 +14,10 @@
               <button :class="['admin-tab', { active: activeTab === 'community' }]" @click="activeTab = 'community'">
                 社区
               </button>
+              <button :class="['admin-tab', { active: activeTab === 'users' }]" @click="activeTab = 'users'">
+                用户
+                <span class="tab-count">{{ users.length }}</span>
+              </button>
             </div>
             <div class="admin-topbar-right">
               <button class="upload-toggle-btn liquid-btn" @click="showUpload = !showUpload">
@@ -135,8 +139,8 @@
                   <Transition name="modal-fade">
                     <div v-if="showDeleteConfirm" class="delete-backdrop" @click.self="showDeleteConfirm = false">
                       <div class="delete-modal liquid-panel">
-                        <h3 class="delete-title">删除歌曲</h3>
-                        <p class="delete-desc">确定删除「<span class="delete-name">{{ deleteTarget?.title }}</span>」吗？此操作不可恢复。</p>
+                        <h3 class="delete-title">{{ deleteTarget?._type === 'user' ? '删除用户' : '删除歌曲' }}</h3>
+                        <p class="delete-desc">确定删除「<span class="delete-name">{{ deleteTarget?._type === 'user' ? (deleteTarget?.nickname || deleteTarget?.username) : deleteTarget?.title }}</span>」吗？此操作不可恢复。</p>
                         <div class="delete-actions">
                           <button class="cancel-btn" @click="showDeleteConfirm = false">取消</button>
                           <button class="confirm-btn" @click="confirmDelete">删除</button>
@@ -152,10 +156,112 @@
               </div>
             </div>
 
+
+
             <!-- 社区占位 -->
             <div v-show="activeTab === 'community'" class="community-placeholder">
               <p>社区管理功能开发中...</p>
             </div>
+
+
+
+            <!-- 用户管理 -->
+            <div v-show="activeTab === 'users'" class="song-list-panel">
+              <div class="list-header" style="grid-template-columns: 44px 1fr 120px 100px 120px 40px;">
+                <span />
+                <span>用户</span>
+                <span>角色</span>
+                <span>注册时间</span>
+                <span>用户名</span>
+                <span />
+              </div>
+              <div class="list-body">
+                <div v-for="user in users" :key="user.id"
+                     class="song-row"
+                     style="grid-template-columns: 44px 1fr 120px 100px 120px 40px;"
+                     :class="{ selected: selectedUser?.id === user.id }"
+                     @click="selectUser(user)">
+                  <div class="col-cover">
+                    <img v-if="user.avatarFile" :src="`/api/user/avatar/${user.avatarFile}`" class="row-cover" />
+                    <div v-else class="row-cover-placeholder" style="border-radius:50%">
+                      {{ user.nickname?.[0] || 'U' }}
+                    </div>
+                  </div>
+                  <div class="col-title">
+                    <span class="song-title">{{ user.nickname || user.username }}</span>
+                  </div>
+                  <span>
+        <span :class="['role-badge', user.role === 'ADMIN' ? 'badge-admin' : 'badge-user']">
+          {{ user.role === 'ADMIN' ? '管理员' : '普通用户' }}
+        </span>
+      </span>
+                  <span class="col-duration">{{ formatUserDate(user.createdAt) }}</span>
+                  <span class="col-artist">{{ user.username }}</span>
+                  <div class="col-actions">
+                    <button class="delete-btn" @click.stop="deleteUser(user)" title="删除用户">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 用户详情面板 -->
+            <Transition name="slide-in">
+              <div v-if="selectedUser && activeTab === 'users'" class="detail-panel liquid-card">
+                <div class="detail-header">
+                  <h3>用户详情</h3>
+                  <button class="close-detail-btn" @click="selectedUser = null">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- 头像 -->
+                <div class="detail-cover">
+                  <img v-if="selectedUser.avatarFile" :src="`/api/user/avatar/${selectedUser.avatarFile}`" style="border-radius:50%; width:100%; height:100%; object-fit:cover;" />
+                  <div v-else class="detail-cover-placeholder" style="font-size:64px;">
+                    {{ selectedUser.nickname?.[0] || 'U' }}
+                  </div>
+                </div>
+
+                <!-- 用户信息 -->
+                <div class="detail-fields">
+                  <div class="field-group">
+                    <label>用户名</label>
+                    <input :value="selectedUser.username" disabled class="field-input" />
+                  </div>
+                  <div class="field-group">
+                    <label>昵称</label>
+                    <input :value="selectedUser.nickname" disabled class="field-input" />
+                  </div>
+                  <div class="field-group">
+                    <label>注册时间</label>
+                    <input :value="formatUserDate(selectedUser.createdAt)" disabled class="field-input" />
+                  </div>
+                  <div class="field-group">
+                    <label>角色</label>
+                    <select v-model="selectedUserRole" class="field-input" @change="updateUserRole">
+                      <option value="USER">普通用户</option>
+                      <option value="ADMIN">管理员</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="detail-actions">
+                  <p v-if="userMsg" class="detail-msg" :class="{ error: userMsgError }">{{ userMsg }}</p>
+                  <button class="save-detail-btn liquid-btn" style="background:rgba(248,113,113,0.3);color:#f87171;"
+                          @click="deleteUser(selectedUser)">
+                    删除用户
+                  </button>
+                </div>
+              </div>
+            </Transition>
+
+
 
             <!-- 歌曲详情面板 -->
             <Transition name="slide-in">
@@ -198,6 +304,8 @@
                     <input v-model="editForm.year" class="field-input" />
                   </div>
                 </div>
+
+
 
                 <!-- 文件状态 -->
                 <div class="file-status">
@@ -256,6 +364,16 @@
                   </div>
 
                 </div>
+
+                <!-- 评论管理 -->
+                <button class="comment-manage-btn" @click="showCommentManager = true">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M21 6.5A2.5 2.5 0 0 0 18.5 4h-13A2.5 2.5 0 0 0 3 6.5v8A2.5 2.5 0 0 0 5.5 17H7v3l4-3h7.5a2.5 2.5 0 0 0 2.5-2.5v-8z"/>
+                  </svg>
+                  管理评论
+                </button>
+
+                <SongCommentManager :visible="showCommentManager" :song="selectedSong" @close="showCommentManager = false" />
 
                 <!-- 保存按钮 -->
                 <div class="detail-actions">
@@ -499,14 +617,19 @@ function deleteSong(song) {
 async function confirmDelete() {
   if (!deleteTarget.value) return
   try {
-    await $apiFetch(`/api/songs/${deleteTarget.value.id}`, { method: 'DELETE' })
-    songs.value = songs.value.filter(s => s.id !== deleteTarget.value.id)
-    if (selectedSong.value?.id === deleteTarget.value.id) selectedSong.value = null
-    emit('uploaded')
-    const plStore = usePlaylistStore()
-    await plStore.fetchPlaylists()
+    if (deleteTarget.value._type === 'user') {
+      await $apiFetch(`/api/user/${deleteTarget.value.id}`, { method: 'DELETE' })
+      users.value = users.value.filter(u => u.id !== deleteTarget.value.id)
+      if (selectedUser.value?.id === deleteTarget.value.id) selectedUser.value = null
+    } else {
+      await $apiFetch(`/api/songs/${deleteTarget.value.id}`, { method: 'DELETE' })
+      songs.value = songs.value.filter(s => s.id !== deleteTarget.value.id)
+      if (selectedSong.value?.id === deleteTarget.value.id) selectedSong.value = null
+      emit('uploaded')
+      const plStore = usePlaylistStore()
+      await plStore.fetchPlaylists()
+    }
   } catch {
-    // 失败不提示
   } finally {
     showDeleteConfirm.value = false
     deleteTarget.value = null
@@ -635,6 +758,69 @@ function removeFile(file) {
   pendingCovers.value = pendingCovers.value.filter(f => f.name !== file.name)
   pendingLyrics.value = pendingLyrics.value.filter(f => f.name !== file.name)
   syncPendingFiles()
+}
+
+
+//  评论管理
+import SongCommentManager from '~/components/user/SongCommentManager.vue'
+const showCommentManager = ref(false)
+//  评论管理  切换歌曲时重置
+watch(selectedSong, () => {
+  showCommentManager.value = false
+})
+
+
+
+// 用户 管理
+const users = ref([])
+const selectedUser = ref(null)
+const selectedUserRole = ref('USER')
+const userMsg = ref('')
+const userMsgError = ref(false)
+
+// 加载用户
+async function loadUsers() {
+  users.value = await $apiFetch('/api/user/all')
+}
+
+// 监听 tab 切换
+watch(activeTab, (tab) => {
+  if (tab === 'users') loadUsers()
+})
+
+function selectUser(user) {
+  selectedUser.value = user
+  selectedUserRole.value = user.role
+  userMsg.value = ''
+}
+
+async function updateUserRole() {
+  try {
+    await $apiFetch(`/api/user/${selectedUser.value.id}/role`, {
+      method: 'PUT',
+      body: { role: selectedUserRole.value },
+    })
+    const idx = users.value.findIndex(u => u.id === selectedUser.value.id)
+    if (idx >= 0) users.value[idx].role = selectedUserRole.value
+    selectedUser.value.role = selectedUserRole.value
+    userMsg.value = '角色更新成功 ✓'
+    userMsgError.value = false
+  } catch (e) {
+    userMsg.value = e?.data?.message || '更新失败'
+    userMsgError.value = true
+  }
+  setTimeout(() => userMsg.value = '', 3000)
+}
+
+async function deleteUser(user) {
+  deleteTarget.value = { ...user, _type: 'user' }
+  showDeleteConfirm.value = true
+}
+
+// 用户 管理
+function formatUserDate(ts) {
+  if (!ts) return '未知'
+  return new Date(ts).toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' })
 }
 
 
@@ -982,6 +1168,74 @@ function removeFile(file) {
 }
 .confirm-btn:hover { background: rgba(248,113,113,0.5); }
 
+
+/* 评论管理 */
+/* =========================================
+   💬 评论管理按钮专属样式
+   ========================================= */
+.comment-manage-btn {
+  /* 基础布局：让图标和文字完美居中对齐 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+
+  /* 视觉设计：半透明紫罗兰色调，显得高级且醒目 */
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd; /* 柔和的亮紫色文字 */
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  /* 动画过渡 */
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 悬浮状态 (Hover)：提亮发光并上浮 */
+.comment-manage-btn:hover {
+  background: rgba(139, 92, 246, 0.4);
+  color: #ffffff;
+  border-color: rgba(139, 92, 246, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.25);
+}
+
+/* 图标微动效：鼠标放上去时小图标微微放大倾斜 */
+.comment-manage-btn svg {
+  transition: transform 0.3s ease;
+}
+.comment-manage-btn:hover svg {
+  transform: scale(1.15) rotate(-5deg);
+}
+
+/* 点击状态 (Active)：弹性按压感 */
+.comment-manage-btn:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+}
+
+/* 🌙 如果你有白天模式，可以加上这个适配： */
+:global(.light-mode) .comment-manage-btn {
+  background: rgba(139, 92, 246, 0.08);
+  color: #7c3aed;
+  border-color: rgba(139, 92, 246, 0.2);
+}
+:global(.light-mode) .comment-manage-btn:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: #6d28d9;
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+
+
+/* 用户 管理 */
+.role-badge { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.badge-admin { background: rgba(251,191,36,0.2); color: #fbbf24; }
+.badge-user { background: rgba(99,102,241,0.2); color: #818cf8; }
 
 
 </style>

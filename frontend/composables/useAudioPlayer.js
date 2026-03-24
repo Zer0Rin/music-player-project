@@ -10,6 +10,10 @@ let _analyser = null
 let _sourceNode = null
 
 
+export function setAudioMuted(muted) {
+    if (_audio) _audio.muted = muted
+}
+
 export function useAudioPlayer() {
   const store = usePlayerStore()
   let rafId = null

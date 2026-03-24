@@ -70,6 +70,11 @@ public class SecurityConfig {
 
                         //放行 评论
                         .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
+                        // AI 评论检索
+                        .requestMatchers("/api/admin/comments/**").hasRole("ADMIN")
+                        //热门 歌单/曲推荐
+                        .requestMatchers(HttpMethod.GET, "/api/songs/hot").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/hot").authenticated()
 
                         .anyRequest().authenticated()
                 )

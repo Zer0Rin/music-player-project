@@ -662,4 +662,23 @@ async function changePassword() {
 .light-mode .section-divider {
   background: rgba(0, 0, 0, 0.08);
 }
+
+/* 6. 修复白天模式下左侧区域和各种 custom-scrollbar 的滚动条看不清的问题 */
+.light-mode .left-settings::-webkit-scrollbar-thumb,
+.light-mode .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2) !important; /* 白天模式下使用半透明的黑色 */
+  border-radius: 4px;
+}
+
+/* 当鼠标悬浮在滚动条滑块上时稍微加深一点 */
+.light-mode .left-settings::-webkit-scrollbar-thumb:hover,
+.light-mode .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 轨道颜色可以给一点极淡的灰色，或者保持透明 */
+.light-mode .left-settings::-webkit-scrollbar-track,
+.light-mode .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
 </style>

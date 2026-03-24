@@ -8,4 +8,5 @@ public interface CommentRepository extends JpaRepository<Comment, String> {
     List<Comment> findBySongIdOrderByCreatedAtDesc(String songId);
     List<Comment> findByParentIdOrderByCreatedAtAsc(String parentId);
     void deleteBySongId(String songId);
+    long countBySongId(String songId);
 }

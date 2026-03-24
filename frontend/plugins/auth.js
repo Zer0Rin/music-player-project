@@ -2,6 +2,16 @@
 export default defineNuxtPlugin((nuxtApp) => {
     const authStore = useAuthStore()
 
+    // 客户端启动时从 localStorage 恢复用户状态
+    if (process.client) {
+        const token = localStorage.getItem('token')
+        const user = JSON.parse(localStorage.getItem('user') || 'null')
+        if (token && user) {
+            authStore.token = token
+            authStore.user = user
+        }
+    }
+
     // 创建一个自带 Token 拦截器的自定义 fetch 实例
     const apiFetch = $fetch.create({
         onRequest({ options }) {

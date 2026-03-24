@@ -127,9 +127,12 @@ export const usePlayerStore = defineStore('player', {
       },
       async loadLyrics(songId) {
           try {
-              const { $apiFetch } = useNuxtApp()
               this.lyricsText = await $apiFetch(`/api/songs/${songId}/lyrics`)
               this.parsedLyrics = parseLrc(this.lyricsText)
+
+              // 从 currentSong 读文件名判断格式
+              const lyricsFile = this.currentSong?.lyricsFile || ''
+              this.lyricMode = lyricsFile.toLowerCase().endsWith('.elrc') ? 'word' : 'line'
           } catch {
               this.lyricsText = ''
               this.parsedLyrics = []

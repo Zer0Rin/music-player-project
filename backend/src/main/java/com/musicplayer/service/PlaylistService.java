@@ -165,6 +165,7 @@ public class PlaylistService {
 
     /** 通过推荐码导入歌单 */
     public Playlist importByShareCode(String code, String targetUserId) {
+
         Playlist source = playlistRepository.findByShareCode(code)
                 .orElseThrow(() -> new RuntimeException("推荐码不存在"));
 
@@ -178,6 +179,10 @@ public class PlaylistService {
         if (source.getUserId().equals(targetUserId)) {
             throw new RuntimeException("不能导入自己的歌单");
         }
+
+        // importCount +1
+        source.setImportCount(source.getImportCount() + 1);
+        playlistRepository.save(source);
 
         // 复制为独立副本
         Playlist copy = new Playlist(source.getName() + "（导入）", false);

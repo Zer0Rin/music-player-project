@@ -13,4 +13,6 @@ public interface PlaylistRepository extends JpaRepository<Playlist, String> {
     //推荐码
     Optional<Playlist> findByShareCode(String shareCode);
 
+    //热门
+    List<Playlist> findByUserIdIsNotNullAndIsSystemFalse();
 }

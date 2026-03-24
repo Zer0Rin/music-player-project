@@ -4,6 +4,7 @@ backend/*.iml
 backend/.mvn/wrapper/maven-wrapper.jar
 backend/music-data/  # 建议忽略本地测试的 SQLite 数据库和上传的文件
 backend/application-secret.yml
+backend/.env
 
 # Frontend
 frontend/node_modules/

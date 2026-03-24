@@ -74,4 +74,15 @@ public class Song {
 
     public boolean isHasEmbeddedLyrics() { return hasEmbeddedLyrics; }
     public void setHasEmbeddedLyrics(boolean hasEmbeddedLyrics) { this.hasEmbeddedLyrics = hasEmbeddedLyrics; }
+
+
+    // 热度字段    热度公式：热度分 = ❤收藏数 × 3 + 评论数 × 2 + 被导入次数 × 5
+    private int hotScore;
+    private long hotScoreUpdatedAt;
+
+    public int getHotScore() { return hotScore; }
+    public void setHotScore(int hotScore) { this.hotScore = hotScore; }
+    public long getHotScoreUpdatedAt() { return hotScoreUpdatedAt; }
+    public void setHotScoreUpdatedAt(long hotScoreUpdatedAt) { this.hotScoreUpdatedAt = hotScoreUpdatedAt; }
+
 }

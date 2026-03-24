@@ -91,6 +91,13 @@ public class Playlist {
     public void setShareCode(String shareCode) { this.shareCode = shareCode; }
     public Long getShareCodeExpiry() { return shareCodeExpiry; }
     public void setShareCodeExpiry(Long shareCodeExpiry) { this.shareCodeExpiry = shareCodeExpiry; }
+
+    //歌单推荐功能
+    private int importCount; // 被导入次数
+
+    public int getImportCount() { return importCount; }
+    public void setImportCount(int importCount) { this.importCount = importCount; }
+
 }
 
 

@@ -12,6 +12,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
@@ -87,6 +90,60 @@ public class UserController {
             return ResponseEntity.internalServerError().body(Map.of("message", "修改失败"));
         }
     }
+
+
+    // 获取所有用户（仅 ADMIN）
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        List<Map<String, Object>> result = users.stream().map(u -> {
+            Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("id", u.getId());
+            map.put("username", u.getUsername());
+            map.put("nickname", u.getNickname() != null ? u.getNickname() : "");
+            map.put("role", u.getRole().name());
+            map.put("avatarFile", u.getAvatarFile() != null ? u.getAvatarFile() : "");
+            map.put("createdAt", u.getCreatedAt());
+            return map;
+        }).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    // 删除用户（仅 ADMIN，不能删自己）
+    @DeleteMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteUser(@PathVariable String userId, Authentication auth) {
+        if (userId.equals(auth.getName())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "不能删除自己"));
+        }
+        try {
+            userRepository.deleteById(userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "删除失败"));
+        }
+    }
+
+    // 修改用户角色（仅 ADMIN）
+    @PutMapping("/{userId}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateRole(@PathVariable String userId,
+                                        @RequestBody Map<String, String> body,
+                                        Authentication auth) {
+        if (userId.equals(auth.getName())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "不能修改自己的角色"));
+        }
+        try {
+            User user = userService.findById(userId);
+            user.setRole(User.Role.valueOf(body.get("role")));
+            userRepository.save(user);
+            return ResponseEntity.ok(toDto(user));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "修改失败"));
+        }
+    }
+
 
     private Map<String, Object> toDto(User user) {
         return Map.of(

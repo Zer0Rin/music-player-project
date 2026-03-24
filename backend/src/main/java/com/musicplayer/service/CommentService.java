@@ -51,7 +51,10 @@ public class CommentService {
 
     public void deleteComment(String commentId, String userId) {
         Comment comment = commentRepository.findById(commentId).orElseThrow();
-        if (!comment.getUserId().equals(userId)) throw new RuntimeException("无权删除");
+        User user = userRepository.findById(userId).orElseThrow();
+        if (!comment.getUserId().equals(userId) && user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("无权删除");
+        }
         commentRepository.delete(comment);
     }
 }

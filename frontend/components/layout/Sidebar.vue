@@ -20,7 +20,7 @@
       <div class="nav-label">发现</div>
       <a class="nav-item" :class="{ active: !plStore.activePlaylistId }" @click.prevent="navTo(null)">
         <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
-        <span>全部歌曲</span>
+        <span>全部</span>
       </a>
       <a class="nav-item" @click.prevent="aiModalOpen = true">
         <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" style="color: var(--accent);">

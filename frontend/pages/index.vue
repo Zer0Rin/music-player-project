@@ -29,6 +29,8 @@
             :songs="displaySongs"
             :page-title="pageTitle"
             :layout-mode="layoutMode"
+            :hot-playlists="hotPlaylists"
+            :hot-songs="hotSongs"
             @editPlaylist="showEditModal = true"
         />
 
@@ -113,6 +115,51 @@ function onCommunityModalToggle(isOpen) {
 }
 const recentActiveTab = ref('music')  // 最近
 
+// 热门 歌单推荐
+const hotPlaylists = ref([])
+const hotSongs = ref([])
+const hotScrollRef = ref(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+const { coverUrl } = useCoverUrl()
+
+async function loadHotSongs() {
+  try {
+    const { $apiFetch } = useNuxtApp()
+    const data = await $apiFetch('/api/hot')
+    hotPlaylists.value = data.playlists || []
+    hotSongs.value = data.songs || []
+    nextTick(() => updateArrows())
+  } catch {}
+}
+
+function scrollHot(dir) {
+  if (hotScrollRef.value) {
+    hotScrollRef.value.scrollBy({ left: dir * 480, behavior: 'smooth' })
+  }
+}
+
+function updateArrows() {
+  const el = hotScrollRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 0
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+function navToPlaylist(pl) {
+  plStore.setActivePlaylist(pl.id)
+}
+
+onMounted(() => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    navigateTo('/login')
+    return
+  }
+})
+
+
+
 onMounted(async () => {
   try {
     const { $apiFetch } = useNuxtApp()
@@ -121,7 +168,10 @@ onMounted(async () => {
     console.error('加载歌曲列表失败:', err)
   }
 
+  await loadHotSongs()
+
   await plStore.fetchPlaylists()
+
   window.addEventListener('keydown', onGlobalKey)
 })
 
@@ -161,7 +211,7 @@ watch(() => plStore.activePlaylistId, (newId) => {
 
 const pageTitle = computed(() => {
   const playlist = plStore.activePlaylist
-  return playlist ? playlist.name : '全部歌曲'
+  return playlist ? playlist.name : '全部'
 })
 const layoutMode = computed(() => {
   const id = plStore.activePlaylistId
@@ -356,6 +406,106 @@ definePageMeta({
 .slide-down-leave-to {
   opacity: 0;
   transform: translateY(100%);
+}
+
+
+/* 热门 歌单推荐 */
+.hot-section {
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+.hot-header {
+  margin-bottom: 10px;
+}
+.hot-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hot-scroll-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.hot-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+.hot-scroll::-webkit-scrollbar { display: none; }
+
+.hot-arrow {
+  position: absolute;
+  z-index: 10;
+  width: 28px; height: 28px;
+  border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.15);
+  color: white; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  backdrop-filter: blur(8px);
+}
+.hot-arrow:hover { background: rgba(255,255,255,0.25); transform: scale(1.1); }
+.hot-arrow.left { left: -14px; }
+.hot-arrow.right { right: -14px; }
+
+.hot-card {
+  flex-shrink: 0;
+  width: 130px;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  scroll-snap-align: start;
+}
+.hot-card:hover { transform: translateY(-4px); }
+
+.hot-cover-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 7px;
+}
+.hot-cover { width: 100%; height: 100%; object-fit: cover; }
+.hot-cover-placeholder {
+  width: 100%; height: 100%;
+  background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.hot-play-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s; color: white;
+}
+.hot-card:hover .hot-play-overlay { opacity: 1; }
+
+.hot-type-badge {
+  position: absolute; top: 6px; left: 6px;
+  background: rgb(250, 172, 245);
+  color: white; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.hot-info { padding: 0 2px; }
+.hot-song-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hot-song-artist {
+  font-size: 11px; color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-top: 2px;
 }
 
 </style>

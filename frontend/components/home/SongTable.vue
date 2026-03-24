@@ -129,31 +129,71 @@
 
     <template v-else-if="layoutMode === 'grid'">
       <div class="grid-body custom-scrollbar">
+        <!-- 热门推荐在滚动容器里面 -->
+        <div v-if="hotPlaylists.length || hotSongs.length" class="hot-section">
+          <div class="hot-header">
+            <span class="hot-title">🔥 热门推荐</span>
+          </div>
+          <div class="hot-scroll-wrap">
+            <button class="hot-arrow left" @click="scrollHot(-1)" v-if="canScrollLeft">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <div class="hot-scroll" ref="hotScrollRef" @scroll="updateArrows">
+              <div v-for="pl in hotPlaylists" :key="'pl-'+pl.id" class="hot-card liquid-card" @click="navToPlaylist(pl)">
+                <div class="hot-cover-wrap">
+                  <img v-if="pl.coverImage" :src="`/api/playlists/${pl.id}/cover`" class="hot-cover" />
+                  <img v-else-if="pl.coverSongId" :src="coverUrl(pl.coverSongId)" class="hot-cover" />
+                  <div v-else class="hot-cover-placeholder">♫</div>
+                  <div class="hot-play-overlay">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                  <span class="hot-type-badge">歌单</span>
+                </div>
+                <div class="hot-info">
+                  <div class="hot-song-title">{{ pl.name }}</div>
+                  <div class="hot-song-artist">{{ pl.songCount }} 首歌曲</div>
+                </div>
+              </div>
+              <div v-for="song in hotSongs" :key="'song-'+song.id" class="hot-card liquid-card" @click="playHotSong(song)">
+                <div class="hot-cover-wrap">
+                  <img v-if="song.coverFile" :src="coverUrl(song.id)" class="hot-cover" />
+                  <div v-else class="hot-cover-placeholder">♫</div>
+                  <div class="hot-play-overlay">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                </div>
+                <div class="hot-info">
+                  <div class="hot-song-title">{{ song.title }}</div>
+                  <div class="hot-song-artist">{{ song.artist }}</div>
+                </div>
+              </div>
+            </div>
+            <button class="hot-arrow right" @click="scrollHot(1)" v-if="canScrollRight">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 全部歌曲标题 -->
+        <div class="section-title-row">
+          <span class="section-title">全部歌曲</span>
+        </div>
+
         <div class="song-grid">
-          <div
-              v-for="song in filteredSongs"
-              :key="'grid-'+song.id"
-              class="grid-card liquid-card"
-              @dblclick="playSong(song)"
-              @contextmenu.prevent="openMenu($event, song)"
-          >
+          <div v-for="song in filteredSongs" :key="'grid-'+song.id" class="grid-card liquid-card"
+               @dblclick="playSong(song)" @contextmenu.prevent="openMenu($event, song)">
             <div class="card-cover-wrap">
               <img :src="coverUrl(song.id)" class="card-cover" @error="e => e.target.style.visibility = 'hidden'" />
-
               <div class="card-play-overlay" @click.stop="playSong(song)">
                 <div v-if="store.currentSong?.id === song.id && store.isPlaying" class="playing-eq grid-eq">
                   <i /><i /><i /><i />
                 </div>
-                <svg v-else viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
-                  <path d="M8 5v14l11-7z"/>
-                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="currentColor" width="40" height="40"><path d="M8 5v14l11-7z"/></svg>
               </div>
-
               <button class="card-fav-btn" :class="{ 'fav-active': plStore.isFavorite(song.id) }" @click.stop="plStore.toggleFavorite(song.id)">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
               </button>
             </div>
-
             <div class="card-info">
               <div class="card-title" :class="{'title-active': store.currentSong?.id === song.id}">{{ song.title }}</div>
               <div class="card-artist">{{ song.artist }}</div>
@@ -221,7 +261,13 @@ const store = usePlayerStore()
 const plStore = usePlaylistStore()
 const { coverUrl } = useCoverUrl()
 
-const props = defineProps({ songs: { type: Array, default: () => [] }, pageTitle: { type: String, default: '全部歌曲' },layoutMode: { type: String, default: 'list' } })
+const props = defineProps({
+  songs: { type: Array, default: () => [] },
+  pageTitle: { type: String, default: '全部歌曲' },
+  layoutMode: { type: String, default: 'list' },
+  hotPlaylists: { type: Array, default: () => [] },
+  hotSongs: { type: Array, default: () => [] },
+})
 const emit = defineEmits(['editPlaylist'])
 const searchQuery = ref('')
 
@@ -278,13 +324,13 @@ function formatDur(s) { const m = Math.floor(s / 60); const sec = Math.floor(s %
 // 获取当前激活的歌单实例
 const activePlaylist = computed(() => plStore.activePlaylist)
 
-// 💡 智能判断当前是否是自定义歌单 (非系统歌单、非特殊视图)
+// 智能判断当前是否是自定义歌单 (非系统歌单、非特殊视图)
 const isCustomPlaylist = computed(() => {
   const id = plStore.activePlaylistId
   return id && id !== 'recent' && id !== 'community' && id !== 'favorites'
 })
 
-// 💡 从当前歌单中移除歌曲
+// 从当前歌单中移除歌曲
 const removeFromCurrentPlaylist = async (song) => {
   if (plStore.activePlaylistId) {
     await plStore.removeSong(plStore.activePlaylistId, song.id)
@@ -326,6 +372,44 @@ watch(() => plStore.activePlaylist, (val) => {
 }, { immediate: true })
 
 
+// 热门
+const { $apiFetch } = useNuxtApp()
+const hotPlaylists = ref([])
+const hotSongs = ref([])
+const hotScrollRef = ref(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+onMounted(async () => {
+  try {
+    const data = await $apiFetch('/api/hot')
+    hotPlaylists.value = data.playlists || []
+    hotSongs.value = data.songs || []
+    nextTick(() => updateArrows())
+  } catch {}
+})
+
+function scrollHot(dir) {
+  hotScrollRef.value?.scrollBy({ left: dir * 480, behavior: 'smooth' })
+}
+
+function updateArrows() {
+  const el = hotScrollRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 0
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+function navToPlaylist(pl) {
+  plStore.setActivePlaylist(pl.id)
+}
+
+function playHotSong(song) {
+  const idx = props.songs.findIndex(s => s.id === song.id)
+  store.playSong(song, idx >= 0 ? idx : 0)
+}
+
+
 
 </script>
 
@@ -334,7 +418,7 @@ watch(() => plStore.activePlaylist, (val) => {
 
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 32px 24px 24px; flex-shrink: 0; }
 .header-left { display: flex; align-items: center; gap: 16px; }
-.gradient-text { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 100%); -webkit-background-clip: text; color: transparent; }
+.gradient-text { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 100%); -webkit-background-clip: text; color: transparent; }
 .light-mode .gradient-text { background: linear-gradient(135deg, #000 0%, #555 100%); -webkit-background-clip: text; }
 .song-count { font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 20px; color: var(--text-primary); }
 
@@ -853,6 +937,37 @@ watch(() => plStore.activePlaylist, (val) => {
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 600; color: white;
 }
+
+
+
+/* 推荐栏 */
+.hot-section { padding: 0 0 16px; }
+.hot-header { margin-bottom: 10px; }
+.hot-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+.hot-scroll-wrap { position: relative; display: flex; align-items: center; }
+.hot-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; }
+.hot-scroll::-webkit-scrollbar { display: none; }
+.hot-arrow { position: absolute; z-index: 10; width: 28px; height: 28px; border-radius: 50%; border: none; background: rgba(255,255,255,0.15); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(8px); }
+.hot-arrow:hover { background: rgba(255,255,255,0.25); }
+.hot-arrow.left { left: -14px; }
+.hot-arrow.right { right: -14px; }
+.hot-card { flex-shrink: 0; width: 130px; border-radius: 12px; padding: 8px; cursor: pointer; transition: all 0.3s ease; }
+.hot-card:hover { transform: translateY(-4px); }
+.hot-cover-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; margin-bottom: 7px; }
+.hot-cover { width: 100%; height: 100%; object-fit: cover; }
+.hot-cover-placeholder { width: 100%; height: 100%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.hot-play-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; color: white; }
+.hot-card:hover .hot-play-overlay { opacity: 1; }
+.hot-type-badge { position: absolute; top: 6px; left: 6px; background: rgba(139,92,246,0.8); color: white; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.hot-info { padding: 0 2px; }
+.hot-song-title { font-size: 12px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hot-song-artist { font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+
+.section-title-row { padding: 8px 0 12px; }
+.section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+
+
+
 
 
 </style>
