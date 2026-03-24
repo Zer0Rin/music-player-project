@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue' // 💡 确保引入了 ref 和 watch
+import { ref, watch } from 'vue'
 import { setAudioMuted } from '~/composables/useAudioPlayer'
 
 let pipVideo = null
@@ -6,42 +6,37 @@ let pipCanvas = null
 let pipCtx = null
 let pipStream = null
 let animFrame = null
-let cachedCoverImg = null  // 缓存封面
-let cachedSongId = null    // 记录上次加载的歌曲id
-let lastVideoState = null  // 记录视频的上一个播放状态，用于解决掉帧
+let cachedCoverImg = null
+let cachedSongId = null
+let lastVideoState = null
+let eventsRegistered = false
+
+const isPip = ref(false)  // 统一用这一个
 
 export function usePictureInPicture() {
     const store = usePlayerStore()
-    const isPip = ref(false)
 
-    // ==========================================
-    // 💡 优化 1：监听当前歌曲变化 (切歌时触发一次)
-    // ==========================================
-    watch(() => store.currentSong, async (newSong) => {
-        if (!newSong || !isPip.value) return
+    // 监听切歌
+    watch(() => store.currentSong?.id, async (newId, oldId) => {
+        if (!newId || newId === oldId) return
+        cachedSongId = newId
+        cachedCoverImg = null
 
-        // 1. 更新系统媒体控制中心的歌曲信息
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: newSong.title || '',
-                artist: newSong.artist || '',
-                album: newSong.album || '',
+        if (!isPip.value) return
+
+        try {
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = reject
+                img.src = `http://localhost:8080/api/songs/${newId}/cover?t=${Date.now()}`
             })
+            cachedCoverImg = img
+        } catch (e) {
+            cachedCoverImg = null
         }
-
-        // 2. 加载新封面
-        await loadCoverIfNeeded(newSong.id)
-    }, { immediate: true })
-
-    // ==========================================
-    // 💡 优化 2：监听播放状态变化 (播放/暂停时触发一次)
-    // ==========================================
-    watch(() => store.isPlaying, (isPlaying) => {
-        if ('mediaSession' in navigator && isPip.value) {
-            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
-        }
-    }, { immediate: true })
-
+    }, { immediate: false })
 
     function initCanvas() {
         if (pipCanvas) return
@@ -50,30 +45,43 @@ export function usePictureInPicture() {
         pipCanvas.width = 480
         pipCanvas.height = 270
         pipCtx = pipCanvas.getContext('2d')
-
         pipStream = pipCanvas.captureStream(30)
         pipVideo = document.createElement('video')
         pipVideo.srcObject = pipStream
         pipVideo.muted = true
-        pipVideo.play()
+        pipVideo.play().then(() => {
+            pipVideo.muted = false  // 播放成功后立刻取消静音
+        })
+        pipVideo.addEventListener('volumechange', () => {
+            setAudioMuted(pipVideo.muted)
+        })
+
+        if (!eventsRegistered) {
+            eventsRegistered = true
+            document.addEventListener('enterpictureinpicture', () => {
+                isPip.value = true
+            })
+            document.addEventListener('leavepictureinpicture', () => {
+                isPip.value = false
+                stopDrawLoop()
+            })
+        }
     }
 
-    // 💡 改造 loadCoverIfNeeded，让它接收 songId 参数，逻辑更纯粹
     async function loadCoverIfNeeded(songId) {
-        if (!songId || songId === cachedSongId) return
+        if (!songId) return
+        if (cachedSongId === songId && cachedCoverImg) return
         cachedSongId = songId
-        cachedCoverImg = null
         try {
             const img = new Image()
             img.crossOrigin = 'anonymous'
             await new Promise((resolve, reject) => {
                 img.onload = resolve
                 img.onerror = reject
-                // 使用绝对或相对路径根据你的实际情况，这里暂时保留你的原样
-                img.src = `http://localhost:8080/api/songs/${songId}/cover`
+                img.src = `http://localhost:8080/api/songs/${songId}/cover?t=${Date.now()}`
             })
             cachedCoverImg = img
-        } catch {
+        } catch (e) {
             cachedCoverImg = null
         }
     }
@@ -87,12 +95,10 @@ export function usePictureInPicture() {
         ctx.fillRect(0, 0, W, H)
 
         if (cachedCoverImg) {
-            // 模糊背景
             ctx.save()
             ctx.filter = 'blur(20px) brightness(0.4)'
             ctx.drawImage(cachedCoverImg, -20, -20, W + 40, H + 40)
             ctx.restore()
-            // 清晰封面
             const size = H - 40
             ctx.save()
             roundRect(ctx, 20, 20, size, size, 12)
@@ -112,9 +118,28 @@ export function usePictureInPicture() {
         ctx.font = '15px system-ui, sans-serif'
         ctx.fillText(truncate(store.currentSong.artist || '', 26), textX, 100, textW)
 
-        // 此时这个文本能正确响应了，因为不用等繁重的元数据更新
         ctx.fillStyle = store.isPlaying ? '#4ade80' : 'rgba(255,255,255,0.4)'
         ctx.fillText(store.isPlaying ? '▶ 播放中' : '⏸ 已暂停', textX, 130, textW)
+
+        // 当前歌词
+        const currentLyric = store.parsedLyrics[store.currentLyricIndex]
+        if (currentLyric?.original?.text) {
+            ctx.fillStyle = 'rgba(255,255,255,0.85)'
+            ctx.font = '14px system-ui, sans-serif'
+            ctx.fillText(
+                truncate(currentLyric.original.text, 20),
+                textX, 158, textW
+            )
+            // 翻译（如果有）
+            if (currentLyric.translation?.text) {
+                ctx.fillStyle = 'rgba(255,255,255,0.45)'
+                ctx.font = '12px system-ui, sans-serif'
+                ctx.fillText(
+                    truncate(currentLyric.translation.text, 24),
+                    textX, 178, textW
+                )
+            }
+        }
 
         const barY = H - 40
         const barW = textW
@@ -135,31 +160,19 @@ export function usePictureInPicture() {
         ctx.textAlign = 'left'
     }
 
-
     function startDrawLoop() {
         if (animFrame) clearInterval(animFrame)
         lastVideoState = store.isPlaying ? 'playing' : 'paused'
-
-        // 现在这里只有轻量级的判断和绘制
         animFrame = setInterval(() => {
-            // 绘制 Canvas 帧
             drawFrame()
-
-            // 修复原生画中画暂停掉帧的 BUG
             if (pipVideo) {
                 if (store.isPlaying) {
                     if (pipVideo.paused) pipVideo.play().catch(() => {})
                     lastVideoState = 'playing'
                 } else {
                     if (lastVideoState === 'playing') {
-                        lastVideoState = 'pausing' // 进入中间态
-
-                        // 强推最后一帧画面
-                        if (pipVideo.paused) {
-                            pipVideo.play().catch(() => {})
-                        }
-
-                        // 60ms 后真正暂停
+                        lastVideoState = 'pausing'
+                        if (pipVideo.paused) pipVideo.play().catch(() => {})
                         setTimeout(() => {
                             if (!store.isPlaying) {
                                 pipVideo.pause()
@@ -171,7 +184,7 @@ export function usePictureInPicture() {
                     }
                 }
             }
-        }, 100) // 10fps
+        }, 100)
     }
 
     function stopDrawLoop() {
@@ -186,22 +199,11 @@ export function usePictureInPicture() {
         }
         initCanvas()
 
-        // 注册 Media Session 控制
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.setActionHandler('play', () => {
-                if (!store.isPlaying) store.togglePlay()
-            })
-            navigator.mediaSession.setActionHandler('pause', () => {
-                if (store.isPlaying) store.togglePlay()
-            })
-            navigator.mediaSession.setActionHandler('previoustrack', () => {
-                store.prevSong()
-            })
-            navigator.mediaSession.setActionHandler('nexttrack', () => {
-                store.nextSong()
-            })
-
-            // 手动触发一次初始化，确保第一次进入画中画就有数据
+            navigator.mediaSession.setActionHandler('play', () => { if (!store.isPlaying) store.togglePlay() })
+            navigator.mediaSession.setActionHandler('pause', () => { if (store.isPlaying) store.togglePlay() })
+            navigator.mediaSession.setActionHandler('previoustrack', () => store.prevSong())
+            navigator.mediaSession.setActionHandler('nexttrack', () => store.nextSong())
             if (store.currentSong) {
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: store.currentSong.title || '',
@@ -213,43 +215,29 @@ export function usePictureInPicture() {
         }
 
         await loadCoverIfNeeded(store.currentSong?.id)
-        await loadCoverIfNeeded()
         startDrawLoop()
+
         await new Promise((resolve) => {
-            if (pipVideo.readyState >= 1) {
-                resolve()
-            } else {
-                pipVideo.addEventListener('loadedmetadata', resolve, { once: true })
-            }
+            if (pipVideo.readyState >= 1) resolve()
+            else pipVideo.addEventListener('loadedmetadata', resolve, { once: true })
         })
+
         try {
             await pipVideo.requestPictureInPicture()
+            isPip.value = true
         } catch (e) {
             console.error('画中画启动失败:', e)
         }
     }
 
     async function exitPip() {
-        if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture()
-        }
+        if (document.pictureInPictureElement) await document.exitPictureInPicture()
         stopDrawLoop()
     }
 
     function togglePip() {
-        if (document.pictureInPictureElement) {
-            exitPip()
-        } else {
-            enterPip()
-        }
-    }
-
-    if (typeof document !== 'undefined') {
-        document.addEventListener('enterpictureinpicture', () => isPip.value = true)
-        document.addEventListener('leavepictureinpicture', () => {
-            isPip.value = false
-            stopDrawLoop()
-        })
+        if (document.pictureInPictureElement) exitPip()
+        else enterPip()
     }
 
     return { togglePip, isPip }

@@ -17,7 +17,7 @@ public class WebConfig {
         config.setAllowedOriginPatterns(List.of("http://localhost:*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(false);
         config.setExposedHeaders(List.of("Content-Range", "Accept-Ranges", "Content-Length"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
