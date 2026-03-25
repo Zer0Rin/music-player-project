@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
 import com.musicplayer.model.Playlist;
 import com.musicplayer.repository.PlaylistRepository;
 
+import org.springframework.scheduling.annotation.Async;
+
 @Service
 public class MusicService {
 
@@ -37,6 +39,7 @@ public class MusicService {
     }
 
     @PostConstruct
+    @Async//异步扫描
     public void scanMusicFiles() {
         Path audioDir = Paths.get(musicDataPath, "audio");
         if (!Files.exists(audioDir)) {
@@ -264,7 +267,7 @@ public class MusicService {
     public void deleteSong(String id) {
         songRepository.findById(id).ifPresent(song -> {
             // 从所有歌单中移除该歌曲
-            List<Playlist> playlists = playlistRepository.findAll();
+            List<Playlist> playlists = playlistRepository.findByContainingSongId(song.getId());
             for (Playlist pl : playlists) {
                 if (pl.getSongIds().remove(song.getId())) {
                     playlistRepository.save(pl);

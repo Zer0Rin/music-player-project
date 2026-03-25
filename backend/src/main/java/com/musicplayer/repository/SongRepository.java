@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
+
 public interface SongRepository extends JpaRepository<Song, String> {
 
     //给 AI 使用的全局模糊搜索（忽略大小写，匹配 标题、歌手 或 专辑）
@@ -14,5 +16,9 @@ public interface SongRepository extends JpaRepository<Song, String> {
             "OR LOWER(s.artist) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
             "OR LOWER(s.album) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     List<Song> searchSongs(@Param("keyword") String keyword);
+
+
+    //getHotSongs() 改用数据库排序
+    List<Song> findByHotScoreGreaterThanOrderByHotScoreDesc(int score, Pageable pageable);
 
 }

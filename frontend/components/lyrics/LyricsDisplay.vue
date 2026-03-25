@@ -125,18 +125,23 @@ function handleScroll() {
 watch(() => store.currentLyricIndex, (newIndex) => {
   if (newIndex < 0 || userScrolling.value) return
   nextTick(() => {
-    const el = lineRefs.value[newIndex]
-    const container = scrollRef.value
-    if (!el || !container) return
-
-    isProgrammaticScroll = true
-
-    container.scrollTo({
-      top: el.offsetTop - container.clientHeight * 0.40,
-      behavior: 'smooth',
+    requestAnimationFrame(() => {
+      const el = lineRefs.value[newIndex]
+      const container = scrollRef.value
+      if (!el || !container) return
+      isProgrammaticScroll = true
+      container.scrollTo({
+        top: el.offsetTop - container.clientHeight * 0.40,
+        behavior: 'smooth',
+      })
     })
   })
 }, { immediate: true })
+
+//切歌时清理 lineRefs 防止内存泄漏
+watch(() => store.currentSong, () => {
+  lineRefs.value = {}
+})
 
 function seekToFocusedLine() {
   if (focusedIndex.value !== -1) {

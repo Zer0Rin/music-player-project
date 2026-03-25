@@ -147,6 +147,14 @@
                           <span class="info-value">{{ store.formattedDuration }}</span>
                         </div>
 
+                        <div class="info-row">
+                          <span class="info-label">下载</span>
+                          <button class="download-song-btn" @click="downloadCurrentSong">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                            下载此歌曲
+                          </button>
+                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -260,6 +268,18 @@ watch(() => store.playMode, () => { showModeTip.value = true; clearTimeout(modeT
 function close() { store.closeLyricView() }
 function onSeek(time) { emit('seek', time) }
 function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s / 60) + ':' + Math.floor(s % 60).toString().padStart(2, '0') }
+
+
+/* 下载单曲 */
+const { downloadSong } = useDownload()
+
+function downloadCurrentSong() {
+  downloadSong(store.currentSong)
+  showSongInfo.value = false
+}
+
+
+
 </script>
 
 <style scoped>
@@ -663,6 +683,17 @@ function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s 
 
 .info-pop-enter-active, .info-pop-leave-active { transition: all 0.3s ease; }
 .info-pop-enter-from, .info-pop-leave-to { opacity: 0; transform: translateY(20px); }
+
+
+/* 下载单曲 */
+.download-song-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 8px; border: none;
+  background: rgba(9, 0, 0, 0.76); color: #8bdcfa;
+  font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.download-song-btn:hover { background: rgba(92, 141, 246, 0.65); }
+
 
 
 </style>

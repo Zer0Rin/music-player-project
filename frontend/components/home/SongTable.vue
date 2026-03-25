@@ -53,7 +53,7 @@
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>
             播放全部
           </button>
-          <button class="btn-action liquid-btn" title="下载">
+          <button class="btn-action liquid-btn" title="下载全部" @click="downloadPlaylist(filteredSongs)">
             <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           </button>
           <button class="btn-action liquid-btn" title="分享" @click="showShare = true">
@@ -211,6 +211,11 @@
       <div v-if="ctxVisible" class="ctx-menu liquid-panel" :style="{ top: ctxY + 'px', left: ctxX + 'px' }" @click.stop>
 
         <div class="ctx-item" @click="playSong(ctxSong); ctxVisible = false">播放</div>
+
+        <div class="ctx-item" @click="downloadSong(ctxSong); ctxVisible = false">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="margin-right:6px"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          下载
+        </div>
 
         <div class="ctx-divider" />
 
@@ -409,6 +414,8 @@ function playHotSong(song) {
   store.playSong(song, idx >= 0 ? idx : 0)
 }
 
+/* 下载 歌单 */
+const { downloadSong, downloadPlaylist } = useDownload()
 
 
 </script>

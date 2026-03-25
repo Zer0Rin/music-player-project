@@ -4,10 +4,12 @@
  */
 
 // 全局单例：audio 元素和 AudioContext（跨组件共享）
+let _apiBase = null
 let _audio = null
 let _audioCtx = null
 let _analyser = null
 let _sourceNode = null
+let playPromise = null
 
 
 export function setAudioMuted(muted) {
@@ -144,8 +146,11 @@ export function useAudioPlayer() {
     }
 
     function _startLoad(songId) {
-        const config = useRuntimeConfig()
-        _audio.src = `${config.public.apiBase}/api/songs/${songId}/audio`
+        if (!_apiBase) {
+            const config = useRuntimeConfig()
+            _apiBase = config.public.apiBase
+        }
+        _audio.src = `${_apiBase}/api/songs/${songId}/audio`
         _audio.load()
         if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume()
         setTimeout(() => {
@@ -155,7 +160,7 @@ export function useAudioPlayer() {
         }, 500)
     }
 
-    let playPromise = null
+
 
     function play() {
         if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume()
@@ -201,7 +206,7 @@ export function useAudioPlayer() {
   })
 
   function destroy() {
-    if (rafId) cancelAnimationFrame(rafId)
+      if (rafId) clearInterval(rafId)
   }
 
     onMounted(() => init())

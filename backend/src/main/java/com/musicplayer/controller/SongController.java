@@ -16,16 +16,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.musicplayer.repository.SongRepository;
+
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
 
     private final MusicService musicService;
     private final HotScoreService hotScoreService;
+    private final SongRepository songRepository;
 
-    public SongController(MusicService musicService, HotScoreService hotScoreService) {
+    public SongController(MusicService musicService, HotScoreService hotScoreService, SongRepository songRepository) {
         this.musicService = musicService;
         this.hotScoreService = hotScoreService;
+        this.songRepository = songRepository;
     }
 
     @GetMapping
@@ -59,6 +63,7 @@ public class SongController {
                     return ResponseEntity.ok()
                             .contentType(MediaType.parseMediaType(mimeType))
                             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                            .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(path.toFile().length()))
                             .body(resource);
                 })
                 .orElse(ResponseEntity.notFound().<Resource>build());
@@ -199,11 +204,9 @@ public class SongController {
 
     @GetMapping("/hot")
     public List<Song> getHotSongs() {
-        return musicService.getAllSongs().stream()
-                .filter(s -> s.getHotScore() > 0)
-                .sorted((a, b) -> b.getHotScore() - a.getHotScore())
-                .limit(20)
-                .collect(java.util.stream.Collectors.toList());
+        return songRepository.findByHotScoreGreaterThanOrderByHotScoreDesc(
+                0, org.springframework.data.domain.PageRequest.of(0, 20)
+        );
     }
 
     @PostMapping("/hot/refresh")

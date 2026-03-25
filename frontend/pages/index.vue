@@ -171,6 +171,7 @@ onMounted(async () => {
   await loadHotSongs()
 
   await plStore.fetchPlaylists()
+  await store.fetchRecentSongs()
 
   window.addEventListener('keydown', onGlobalKey)
 })

@@ -16,7 +16,7 @@ export const usePlayerStore = defineStore('player', {
       playMode: 'sequence',
       lyricMode: 'line',
       showLyricView: false,
-      recentSongs: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : [],// 为了搭建 ”最近“板块 新增：最近播放列表（安全读取本地存储）
+      recentSongs: [],
       allSongs: [],
 
 
@@ -114,15 +114,25 @@ export const usePlayerStore = defineStore('player', {
 
           await this.loadLyrics(song.id)
       },
-      addRecentSong(song) {
-          // 过滤掉已存在的同一首歌，提置顶
+      //最近歌曲
+      async addRecentSong(song) {
+          // 保留本地状态（用于当前会话显示）
           this.recentSongs = this.recentSongs.filter(s => s.id !== song.id)
           this.recentSongs.unshift(song)
-          // 限制 100 首防止爆内存
           if (this.recentSongs.length > 100) this.recentSongs.pop()
-          // 持久化到本地
-          if (typeof window !== 'undefined') {
-              localStorage.setItem('recentSongs', JSON.stringify(this.recentSongs))
+
+          // 同步到后端（不 await，不阻塞播放）
+          try {
+              const { $apiFetch } = useNuxtApp()
+              $apiFetch(`/api/recent/${song.id}`, { method: 'POST' }).catch(() => {})
+          } catch {}
+      },
+      async fetchRecentSongs() {
+          try {
+              const { $apiFetch } = useNuxtApp()
+              this.recentSongs = await $apiFetch('/api/recent')
+          } catch (e) {
+              console.error('加载最近播放失败:', e)
           }
       },
       async loadLyrics(songId) {

@@ -76,6 +76,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/songs/hot").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/hot").authenticated()
 
+                        // 最近 歌曲
+                        .requestMatchers("/api/recent/**").authenticated()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
