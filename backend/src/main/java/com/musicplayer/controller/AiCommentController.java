@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.http.ResponseEntity;
+
+import com.musicplayer.service.AiCommentService;
+
 import java.util.List;
 
 @RestController
@@ -13,9 +17,12 @@ public class AiCommentController {
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper; // 用于将 List 转换为 JSON 字符串
+    private final AiCommentService aiCommentService;
 
-    public AiCommentController(ChatClient.Builder builder) {
+    public AiCommentController(ChatClient.Builder builder, AiCommentService aiCommentService) {
         this.objectMapper = new ObjectMapper();
+
+        this.aiCommentService = aiCommentService;
 
         // 配置系统提示词，严格约束大模型的角色和输出格式
         this.chatClient = builder
@@ -59,4 +66,19 @@ public class AiCommentController {
         public String getContent() { return content; }
         public void setContent(String content) { this.content = content; }
     }
+
+
+
+    //生成端点  AI乐评人
+    @PostMapping("/generate/{songId}")
+    public ResponseEntity<String> generateAiComment(@PathVariable String songId) {
+        try {
+            String result = aiCommentService.generateAndSaveComment(songId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(e.getMessage());
+        }
+    }
+
+
 }

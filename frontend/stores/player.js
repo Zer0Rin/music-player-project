@@ -201,9 +201,15 @@ export const usePlayerStore = defineStore('player', {
 
       async refreshSongs(apiFetch) {
           const songs = await apiFetch('/api/songs')
-          this.allSongs = songs
-          this.setPlaylist(songs)
-      },
+
+          // Fisher-Yates 洗牌
+          for (let i = songs.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [songs[i], songs[j]] = [songs[j], songs[i]]
+          }
+
+          this.allSongs  = songs
+      }
 
 
 

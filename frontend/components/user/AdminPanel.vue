@@ -20,6 +20,16 @@
               </button>
             </div>
             <div class="admin-topbar-right">
+
+              <!-- 热度刷新 -->
+              <button class="upload-toggle-btn liquid-btn" @click="refreshHotScore" :disabled="isRefreshingHot" title="刷新热度分">
+                <svg class="w-4 h-4" :style="isRefreshingHot ? 'animation: spin 1s linear infinite' : ''"
+                     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                {{ isRefreshingHot ? '更新中...' : '热度' }}
+              </button>
+
               <button class="upload-toggle-btn liquid-btn" @click="showUpload = !showUpload">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                   <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
@@ -397,7 +407,7 @@
 
 <script setup>
 const props = defineProps({ visible: Boolean })
-const emit = defineEmits(['close', 'uploaded'])
+const emit = defineEmits(['close', 'uploaded', 'hotRefreshed'])
 const { $apiFetch } = useNuxtApp()
 
 //管理 删除 歌单
@@ -821,6 +831,24 @@ async function deleteUser(user) {
 function formatUserDate(ts) {
   if (!ts) return '未知'
   return new Date(ts).toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' })
+}
+
+
+
+// 热度刷新
+const isRefreshingHot = ref(false)
+
+async function refreshHotScore() {
+  if (isRefreshingHot.value) return
+  isRefreshingHot.value = true
+  try {
+    await $apiFetch('/api/hot/refresh', { method: 'POST' })
+    emit('hotRefreshed') // 加这行
+  } catch (e) {
+    console.error('热度刷新失败', e)
+  } finally {
+    isRefreshingHot.value = false
+  }
 }
 
 

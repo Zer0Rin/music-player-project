@@ -19,4 +19,7 @@ public interface RecentPlayRepository extends JpaRepository<RecentPlay, String> 
     @Transactional
     @Query("DELETE FROM RecentPlay r WHERE r.userId = :userId AND r.playedAt = (SELECT MIN(r2.playedAt) FROM RecentPlay r2 WHERE r2.userId = :userId)")
     void deleteOldestByUserId(@Param("userId") String userId);
+
+    long countBySongId(String songId);
+
 }

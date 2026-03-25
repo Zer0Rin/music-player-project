@@ -368,6 +368,13 @@ async function changePassword() {
   }
 }
 
+
+/* 刷新 热度 */
+function onHotRefreshed() {
+  const hotVersion = useState('hotVersion', () => 0)
+  hotVersion.value++
+}
+
 </script>
 
 <style scoped>

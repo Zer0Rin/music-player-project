@@ -76,6 +76,7 @@
       <div class="search-box liquid-panel list-search">
         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="search-icon"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input v-model="searchQuery" type="text" placeholder="在歌单内搜索..." class="search-input" @keydown.esc="searchQuery = ''" />
+        <span v-if="isLyricsSearching" class="lyrics-searching">🎵 搜索歌词中...</span>
         <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
       </div>
     </header>
@@ -111,6 +112,11 @@
           <span class="col-title">
             <img :src="coverUrl(song.id)" class="row-cover" @error="e => e.target.style.visibility = 'hidden'" />
             <span class="row-title" :class="{ 'title-active': store.currentSong?.id === song.id }">{{ song.title }}</span>
+          </span>
+
+          <!-- 歌词片段 -->
+          <span v-if="song._lyricsSnippet" class="lyrics-snippet" :title="song._lyricsSnippet">
+            {{ song._lyricsSnippet }}
           </span>
 
           <span class="col-artist">{{ song.artist }}</span>
@@ -197,6 +203,9 @@
             <div class="card-info">
               <div class="card-title" :class="{'title-active': store.currentSong?.id === song.id}">{{ song.title }}</div>
               <div class="card-artist">{{ song.artist }}</div>
+              <div v-if="song._lyricsSnippet" class="card-lyrics-snippet" :title="song._lyricsSnippet">
+                {{ song._lyricsSnippet }}
+              </div>
             </div>
           </div>
         </div>
@@ -276,19 +285,71 @@ const props = defineProps({
 const emit = defineEmits(['editPlaylist'])
 const searchQuery = ref('')
 
+
+const lyricsResults = ref([])      // 歌词搜索结果
+const isLyricsSearching = ref(false)
+const lyricsSearchTimer = ref(null)
+
+// 歌词搜索防抖
+watch(searchQuery, (q) => {
+  clearTimeout(lyricsSearchTimer.value)
+  lyricsResults.value = []
+  if (!q.trim()) return
+  lyricsSearchTimer.value = setTimeout(async () => {
+    isLyricsSearching.value = true
+    try {
+      const res = await $apiFetch(`/api/songs/search/lyrics?q=${encodeURIComponent(q.trim())}`)
+      lyricsResults.value = res
+    } catch {}
+    finally { isLyricsSearching.value = false }
+  }, 400) // 400ms 防抖
+})
+
+
 const filteredSongs = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return props.songs
-  return props.songs.filter(song => song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q) || song.album.toLowerCase().includes(q))
+
+  // 先做本地标题/艺术家/专辑过滤
+  const localMatches = props.songs.filter(song =>
+      song.title?.toLowerCase().includes(q) ||
+      song.artist?.toLowerCase().includes(q) ||
+      song.album?.toLowerCase().includes(q)
+  )
+
+  // 合并歌词搜索结果（去重）
+  const lyricsIds = new Set(lyricsResults.value.map(s => s.id))
+  const localIds = new Set(localMatches.map(s => s.id))
+
+  // 歌词结果中不在本地结果里的，从 allSongs 里找完整数据补充
+  const lyricsOnly = lyricsResults.value
+      .filter(s => !localIds.has(s.id))
+      .map(s => {
+        const full = props.songs.find(ps => ps.id === s.id)
+        return full ? { ...full, _lyricsSnippet: s.snippet } : null
+      })
+      .filter(Boolean)
+
+  // 本地结果补充 snippet
+  const localWithSnippet = localMatches.map(s => ({
+    ...s,
+    _lyricsSnippet: lyricsResults.value.find(lr => lr.id === s.id)?.snippet || null
+  }))
+
+  return [...localWithSnippet, ...lyricsOnly]
 })
 
 function playSong(song) { const realIndex = props.songs.findIndex(s => s.id === song.id); store.playSong(song, realIndex); ctxVisible.value = false; }
 
 const ctxVisible = ref(false); const ctxX = ref(0); const ctxY = ref(0); const ctxSong = ref(null)
 
-// ====== 新增：处理添加到歌单（包含查重拦截） ======
+
+
+// ====== 处理添加到歌单（包含查重拦截） ======
 const showDuplicateToast = ref(false)
 const duplicateMsg = ref('')
+
+import { ref, computed, watch, nextTick } from 'vue'
 
 async function addToPlaylist(playlist, song) {
   // 1. 查重拦截：如果歌单里已经有这首歌
@@ -314,14 +375,20 @@ async function addToPlaylist(playlist, song) {
 
 // 防止菜单跑出屏幕底部的智能定位
 function openMenu(e, song) {
-  ctxSong.value = song;
-  ctxVisible.value = true;
-  // 简单计算，防止菜单溢出屏幕下边缘
-  setTimeout(() => {
-    const menuHeight = 300; // 预估最大高度
-    ctxX.value = e.clientX;
-    ctxY.value = e.clientY + menuHeight > window.innerHeight ? window.innerHeight - menuHeight : e.clientY;
-  }, 0)
+  ctxSong.value = song
+  ctxVisible.value = true
+  nextTick(() => {
+    const menuEl = document.querySelector('.ctx-menu')
+    if (!menuEl) return
+    const menuHeight = menuEl.offsetHeight
+    const menuWidth = menuEl.offsetWidth
+    ctxX.value = e.clientX + menuWidth > window.innerWidth
+        ? e.clientX - menuWidth
+        : e.clientX
+    ctxY.value = e.clientY + menuHeight > window.innerHeight
+        ? window.innerHeight - menuHeight - 8
+        : e.clientY
+  })
 }
 
 function formatDur(s) { const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}` }
@@ -537,17 +604,27 @@ const { downloadSong, downloadPlaylist } = useDownload()
 .empty-title { font-size: 20px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.05em; }
 
 .ctx-backdrop { position: fixed; inset: 0; z-index: 9998; }
-.ctx-menu { position: fixed; z-index: 9999; border-radius: 12px; padding: 6px; min-width: 160px; display: flex; flex-direction: column;}
+.ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow: hidden;
+}
 .ctx-item { padding: 10px 14px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
 .ctx-item:hover { background: rgba(255, 255, 255, 0.1); transform: translateX(2px); }
 
-/* 💡 滚动区域样式 */
+/* 滚动区域样式 */
 .ctx-scroll-area { max-height: 180px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;}
 .ctx-scroll-area::-webkit-scrollbar { width: 4px; }
 .ctx-scroll-area::-webkit-scrollbar-track { background: transparent; }
 .ctx-scroll-area::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
 
-/* 💡 危险操作（删除）样式 */
+/* 危险操作（删除）样式 */
 .ctx-delete { color: #ef4444; }
 .ctx-delete:hover { background: rgba(239, 68, 68, 0.15) !important; color: #ef4444; }
 
@@ -974,7 +1051,29 @@ const { downloadSong, downloadPlaylist } = useDownload()
 .section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
 
 
-
+/* 搜索 歌词 - 歌曲 */
+.lyrics-snippet {
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.card-lyrics-snippet {
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lyrics-searching {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
 
 
 </style>

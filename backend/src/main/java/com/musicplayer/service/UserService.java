@@ -4,6 +4,7 @@ import com.musicplayer.model.Playlist;
 import com.musicplayer.model.User;
 import com.musicplayer.repository.PlaylistRepository;
 import com.musicplayer.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
@@ -124,4 +125,24 @@ public class UserService {
         int dot = filename.lastIndexOf('.');
         return dot >= 0 ? filename.substring(dot + 1) : "jpg";
     }
+
+
+    // AI乐评人
+    private static final String AI_CRITIC_USER_ID = "ai-critic-001";
+    public static final String AI_CRITIC_ID = "00000000-0000-0000-0000-000000000001";
+
+    @PostConstruct
+    public void initAiCriticAccount() {
+        if (userRepository.existsById(AI_CRITIC_ID)) return; // 已存在就跳过
+        User aiCritic = new User();
+        aiCritic.setId(AI_CRITIC_ID);
+        aiCritic.setUsername("AI 乐评人");
+        aiCritic.setPassword("");
+        aiCritic.setRole(User.Role.USER);
+        userRepository.save(aiCritic);
+        System.out.println("[UserService] AI 乐评人账号已初始化");
+    }
+
+
+
 }

@@ -88,6 +88,9 @@
     />
 
   </div>
+
+
+
 </template>
 
 <script setup>
@@ -241,6 +244,13 @@ function onGlobalKey(e) {
 definePageMeta({
   middleware: 'auth'
 })
+
+/* 刷新热度 */
+function onHotRefreshed() {
+  const hotVersion = useState('hotVersion', () => 0)
+  hotVersion.value++
+}
+
 
 </script>
 

@@ -23,6 +23,9 @@ import com.musicplayer.repository.PlaylistRepository;
 
 import org.springframework.scheduling.annotation.Async;
 
+import org.springframework.context.annotation.Lazy;
+import java.util.concurrent.CompletableFuture;
+
 @Service
 public class MusicService {
 
@@ -32,9 +35,14 @@ public class MusicService {
     private final SongRepository songRepository;
     private final PlaylistRepository playlistRepository;
 
-    public MusicService(SongRepository songRepository, PlaylistRepository playlistRepository) {
+    private final AiCommentService aiCommentService;
+
+    public MusicService(SongRepository songRepository,
+                        PlaylistRepository playlistRepository,
+                        @Lazy AiCommentService aiCommentService) {
         this.songRepository = songRepository;
         this.playlistRepository = playlistRepository;
+        this.aiCommentService = aiCommentService;
         Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     }
 
@@ -89,7 +97,17 @@ public class MusicService {
                 } else {
                     // 新歌曲：读取 ID3 标签入库
                     Song song = createSongFromFile(audioFile);
-                    songRepository.save(song);
+
+                    Song saved = songRepository.save(song);
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            aiCommentService.generateAndSaveComment(saved.getId());
+                            System.out.println("[MusicService] AI 评论已生成: " + saved.getTitle());
+                        } catch (Exception e) {
+                            System.err.println("[MusicService] AI 评论生成失败: " + e.getMessage());
+                        }
+                    });
+
                     System.out.println("[MusicService] 新增: " + song.getTitle()
                             + " | 艺术家: " + song.getArtist()
                             + " | 专辑: " + song.getAlbum()
@@ -295,6 +313,9 @@ public class MusicService {
     public Path getLyricsDir() {
         return Paths.get(musicDataPath, "lyrics");
     }
+
+
+
 
 
 }

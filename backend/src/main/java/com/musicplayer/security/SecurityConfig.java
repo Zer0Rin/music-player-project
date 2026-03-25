@@ -79,6 +79,15 @@ public class SecurityConfig {
                         // 最近 歌曲
                         .requestMatchers("/api/recent/**").authenticated()
 
+                        //AI 歌词分析
+                        .requestMatchers("/api/ai/analysis/**").permitAll()
+
+                        //AI乐评人
+                        .requestMatchers("/api/ai-comment/generate/**").hasRole("ADMIN")
+
+                        // 热度刷新
+                        .requestMatchers("/api/hot/refresh").hasRole("ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

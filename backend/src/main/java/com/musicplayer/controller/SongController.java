@@ -18,6 +18,12 @@ import java.util.Map;
 
 import com.musicplayer.repository.SongRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+import java.util.stream.Collectors;
+import java.util.Arrays;
+
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
@@ -222,4 +228,61 @@ public class SongController {
         return lower.endsWith(".mp3") || lower.endsWith(".flac") ||
                 lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".m4a");
     }
+
+
+
+    //歌词搜索歌
+    @GetMapping("/search/lyrics")
+    public List<Map<String, Object>> searchByLyrics(@RequestParam String q) {
+        if (q == null || q.isBlank()) return List.of();
+
+        String keyword = q.trim().toLowerCase();
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        for (Song song : musicService.getAllSongs()) {
+            if (song.getLyricsFile() == null) continue;
+            try {
+                Path lyricsPath = musicService.getLyricsPath(song.getLyricsFile());
+                if (!Files.exists(lyricsPath)) continue;
+                String raw = Files.readString(lyricsPath, StandardCharsets.UTF_8);
+                System.out.println("[LyricsDebug] raw: " + raw.substring(0, Math.min(200, raw.length())));
+                // 去时间轴
+                String text = Arrays.stream(raw.split("\n"))
+                        .filter(line -> {
+                            String trimmed = line.trim();
+                            // 只保留 LRC 时间轴行，跳过 JSON 行和元数据行
+                            return trimmed.matches("^\\[\\d{2}:\\d{2}[.:].+\\].*")
+                                    && !trimmed.startsWith("{");
+                        })
+                        .map(line -> line.replaceAll("^\\[\\d{2}:\\d{2}[.:]\\d{2,3}\\]", "")) // 去时间轴
+                        .map(line -> line.replaceAll("\\{[^}]*\\}", ""))                        // 去 ELRC 逐字
+                        .map(line -> line.replaceAll("\\[.*?\\]", ""))                          // 去其他标签
+                        .map(String::trim)
+                        .filter(l -> !l.isBlank())
+                        .collect(Collectors.joining(" "));
+
+                if (!text.toLowerCase().contains(keyword)) continue;
+
+                // 提取匹配片段（关键词前后各20字）
+                int idx = text.toLowerCase().indexOf(keyword);
+                int start = Math.max(0, idx - 15);
+                int end = Math.min(text.length(), idx + keyword.length() + 30);
+                String snippet = (start > 0 ? "..." : "")
+                        + text.substring(start, end).trim()
+                        + (end < text.length() ? "..." : "");
+
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("id", song.getId());
+                map.put("title", song.getTitle());
+                map.put("artist", song.getArtist());
+                map.put("coverFile", song.getCoverFile());
+                map.put("snippet", snippet);
+                results.add(map);
+            } catch (Exception ignored) {}
+        }
+        return results;
+    }
+
+
+
 }

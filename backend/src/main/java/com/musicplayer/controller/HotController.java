@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.musicplayer.service.HotScoreService;
+import org.springframework.http.ResponseEntity;
+
 @RestController
 @RequestMapping("/api/hot")
 public class HotController {
@@ -17,9 +20,21 @@ public class HotController {
     private final MusicService musicService;
     private final PlaylistRepository playlistRepository;
 
-    public HotController(MusicService musicService, PlaylistRepository playlistRepository) {
+
+    private final HotScoreService hotScoreService;
+
+    public HotController(MusicService musicService,
+                         PlaylistRepository playlistRepository,
+                         HotScoreService hotScoreService) {
         this.musicService = musicService;
         this.playlistRepository = playlistRepository;
+        this.hotScoreService = hotScoreService;
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<String> refresh() {
+        hotScoreService.updateNow();
+        return ResponseEntity.ok("热度已刷新");
     }
 
     @GetMapping

@@ -105,60 +105,6 @@
                 <button class="fn-btn" title="歌曲信息" @click="showSongInfo = true">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                 </button>
-
-                <!-- 歌曲详情小窗 -->
-                <Transition name="info-pop">
-                  <div v-if="showSongInfo" class="song-info-popup" @click.self="showSongInfo = false">
-                    <div class="song-info-panel">
-                      <div class="info-header">
-                        <span class="info-title">歌曲信息</span>
-                        <button class="info-close" @click="showSongInfo = false">
-                          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                          </svg>
-                        </button>
-                      </div>
-                      <div class="info-cover">
-                        <img v-if="store.currentSong" :src="coverUrl(store.currentSong.id)" class="info-cover-img" />
-                      </div>
-                      <div class="info-rows" v-if="store.currentSong">
-                        <div class="info-row">
-                          <span class="info-label">标题</span>
-                          <span class="info-value">{{ store.currentSong.title || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                          <span class="info-label">艺术家</span>
-                          <span class="info-value">{{ store.currentSong.artist || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                          <span class="info-label">专辑</span>
-                          <span class="info-value">{{ store.currentSong.album || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                          <span class="info-label">流派</span>
-                          <span class="info-value">{{ store.currentSong.genre || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                          <span class="info-label">年份</span>
-                          <span class="info-value">{{ store.currentSong.year || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                          <span class="info-label">时长</span>
-                          <span class="info-value">{{ store.formattedDuration }}</span>
-                        </div>
-
-                        <div class="info-row">
-                          <span class="info-label">下载</span>
-                          <button class="download-song-btn" @click="downloadCurrentSong">
-                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                            下载此歌曲
-                          </button>
-                        </div>
-
-                      </div>
-                    </div>
-                  </div>
-                </Transition>
               </div>
             </div>
 
@@ -177,7 +123,92 @@
           <LyricsDisplay @seek="onSeek" />
         </div>
       </div>
-    </div>
+      <!-- 歌曲详情小窗 — 移到 lyric-overlay 直接子级 -->
+      <Transition name="info-pop">
+        <div v-if="showSongInfo" class="song-info-popup" @click.self="showSongInfo = false">
+          <div class="song-info-panel">
+            <div class="info-header">
+              <span class="info-title">歌曲信息</span>
+              <button class="info-close" @click="showSongInfo = false">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="info-cover">
+              <img v-if="store.currentSong" :src="coverUrl(store.currentSong.id)" class="info-cover-img" />
+            </div>
+            <div class="info-rows" v-if="store.currentSong">
+              <div class="info-row">
+                <span class="info-label">标题</span>
+                <span class="info-value">{{ store.currentSong.title || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">艺术家</span>
+                <span class="info-value">{{ store.currentSong.artist || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">专辑</span>
+                <span class="info-value">{{ store.currentSong.album || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">流派</span>
+                <span class="info-value">{{ store.currentSong.genre || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">年份</span>
+                <span class="info-value">{{ store.currentSong.year || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">时长</span>
+                <span class="info-value">{{ store.formattedDuration }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">下载</span>
+                <button class="download-song-btn" @click="downloadCurrentSong">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                  </svg>
+                  下载此歌曲
+                </button>
+              </div>
+              <div class="info-row">
+                <span class="info-label">AI 解析</span>
+                <button class="download-song-btn ai-analysis-btn" @click="openAiAnalysis">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V15a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 11H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 16.93z"/>
+                  </svg>
+                  AI 歌曲解析
+                </button>
+              </div>
+              <div class="info-row">
+                <span class="info-label">定时器</span>
+                <button class="download-song-btn ai-analysis-btn" @click="openSleepTimer">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+                  </svg>
+                  睡眠定时器
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- AI 解析面板 -->
+      <AiSongAnalysis
+          :visible="showAiAnalysis"
+          :song-id="store.currentSong?.id"
+          @close="showAiAnalysis = false"
+      />
+
+      <!-- 睡眠定时 -->
+      <SleepTimer
+          :visible="showSleepTimer"
+          @close="showSleepTimer = false"
+      />
+
+    </div><!-- lyric-overlay 结束 -->
   </Transition>
   <CommentPanel :visible="showComment" @close="showComment = false" />
 </template>
@@ -189,6 +220,17 @@ import AudioVisualizer from './AudioVisualizer.vue'
 import LyricsDisplay from '~/components/lyrics/LyricsDisplay.vue'
 // 引入评论面板
 import CommentPanel from '~/components/player/CommentPanel.vue'
+
+// AI 歌曲解析
+import AiSongAnalysis from '~/components/player/AiSongAnalysis.vue'
+
+// 睡眠模式
+import SleepTimer from '~/components/player/SleepTimer.vue'
+const showSleepTimer = ref(false)
+function openSleepTimer() {
+  showSongInfo.value = false
+  setTimeout(() => { showSleepTimer.value = true }, 300)
+}
 
 // 假设这些是你原本定义的 composables
 const store = usePlayerStore()
@@ -203,6 +245,9 @@ const showComment = ref(false)
 
 // 设置/详细信息
 const showSongInfo = ref(false)
+
+// AI歌词解析
+const showAiAnalysis = ref(false)
 
 function toggleFlip() {
   if (isMobile.value) {
@@ -276,6 +321,16 @@ const { downloadSong } = useDownload()
 function downloadCurrentSong() {
   downloadSong(store.currentSong)
   showSongInfo.value = false
+}
+
+
+/* 歌词AI解析 */
+function openAiAnalysis() {
+  showSongInfo.value = false
+  setTimeout(() => {
+    console.log('opening AI analysis, songId:', store.currentSong?.id)
+    showAiAnalysis.value = true
+  }, 300)
 }
 
 
@@ -435,11 +490,7 @@ function downloadCurrentSong() {
   align-items: center;
   text-align: center;
   width: 100%;
-
-  /* 💡 罪魁祸首修复：左右对称 Padding！
-     左侧和右侧各留出 90px 的安全区。
-     这样不仅防止了文字撞到右侧按钮，还能保证文字的物理中心始终在屏幕绝对中央！ */
-  padding: 0 90px;
+  padding: 0 ;
   box-sizing: border-box;
 }
 
@@ -452,6 +503,12 @@ function downloadCurrentSong() {
 }
 
 .track-title {
+  width: 100%;
+  padding: 0 16px; /* 歌名有极大展示空间，仅保留边缘防撞 */
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 27px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -459,24 +516,29 @@ function downloadCurrentSong() {
 }
 
 .track-artist {
+  width: 100%;
+  padding: 0 90px; /* 仅歌手行左右留出 90px，为操作按钮让出空间，同时保证自身视觉居中 */
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 21px;
   color: rgba(255, 255, 255, 0.5);
   margin-top: 5px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* 3. 右侧按钮区 (❤ 和 💬)：绝对定位，占用全高自动垂直居中 */
+/* 3. 右侧按钮区 (❤ 和 💬)：解除垂直居中，下沉对齐到歌手行 */
 .track-actions {
   position: absolute;
   right: 0;
-  top: 0;
-  bottom: 0;
-  height: 100%;
+  top: auto;
+  bottom: -6px;   /* 吸附到底部，-6px 用来抵消按钮自身的 padding，使图标中心与文字中心绝对齐平 */
+  height: auto;
   display: flex;
-  align-items: center; /* 借用 flex 实现完美的垂直居中，抛弃 translate */
+  align-items: center;
   gap: 8px;
 }
-
 /* 按钮基础样式与悬浮反馈 */
 .track-fav-btn,
 .track-comment-btn {
@@ -553,29 +615,35 @@ function downloadCurrentSong() {
 
   .track-meta {
     text-align: left;
-    /* 手机端由于文字是靠左的，所以左边不需要防撞墙，只保留右边防撞即可 */
-    padding-left: 0 !important;
-    padding-right: 90px;
+    padding: 0 !important;
     align-items: flex-start !important;
   }
 
   .track-title {
+    width: 100%;
     font-size: 22px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    padding-right: 0;
-  }
-  .track-artist {
-    font-size: 16px; margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 16px; /* 移动端给歌名释放最长空间 */
   }
 
-  /* 💡 移动端核心定位：让按钮组整体绝对定位，垂直居中釘在最右侧 */
+  .track-artist {
+    width: 100%;
+    font-size: 16px;
+    margin-top: 2px;
+    padding-right: 90px; /* 仅歌手名右侧留出 90px 给按钮组 */
+  }
+
   .track-actions {
     position: absolute;
     right: -8px;
-    top: 50%;
-    transform: translateY(-50%); /* 整体垂直居中 */
+    top: auto;
+    bottom: -8px;     /* 吸附到底部，由于手机端文字变小，向下微调 -8px 达到视觉居中对齐 */
+    transform: none;
     justify-content: flex-end;
-    gap: 10px; /* 控制手机上 ❤ 和 💬 的间距 */
+    align-items: center;
+    gap: 10px;
     margin-top: 0;
   }
 
@@ -694,6 +762,15 @@ function downloadCurrentSong() {
 }
 .download-song-btn:hover { background: rgba(92, 141, 246, 0.65); }
 
+
+/* 歌词ai解析 */
+.ai-analysis-btn {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+.ai-analysis-btn:hover {
+  background: rgba(139, 92, 246, 0.35);
+}
 
 
 </style>

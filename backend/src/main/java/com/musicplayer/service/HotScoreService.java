@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
+import com.musicplayer.repository.RecentPlayRepository;
+
 import java.util.List;
 
 @Service
@@ -17,12 +19,16 @@ public class HotScoreService {
     private final PlaylistRepository playlistRepository;
     private final CommentRepository commentRepository;
 
+    private final RecentPlayRepository recentPlayRepository;
+
     public HotScoreService(SongRepository songRepository,
                            PlaylistRepository playlistRepository,
-                           CommentRepository commentRepository) {
+                           CommentRepository commentRepository,
+                           RecentPlayRepository recentPlayRepository) {
         this.songRepository = songRepository;
         this.playlistRepository = playlistRepository;
         this.commentRepository = commentRepository;
+        this.recentPlayRepository = recentPlayRepository;
     }
 
     // 每小时更新一次，cron = 每小时0分0秒
@@ -47,7 +53,9 @@ public class HotScoreService {
                     .sum();
 
             // 热度公式
-            int score = (int)(favoriteCount * 3 + commentCount * 2 + importCount * 5);
+            long playCount = recentPlayRepository.countBySongId(song.getId());
+
+            int score = (int)(playCount * 0.1 + favoriteCount * 3 + commentCount * 2 + importCount * 5);
             song.setHotScore(score);
             song.setHotScoreUpdatedAt(System.currentTimeMillis());
             songRepository.save(song);

@@ -15,6 +15,18 @@
             </div>
 
             <div class="cm-header-actions">
+
+              <!-- 生成 AI 评论 -->
+              <button class="ai-generate-btn" @click="generateAiComment" :disabled="isGenerating" title="生成 AI 评论">
+                <svg v-if="!isGenerating" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+                </svg>
+                <svg v-else class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                {{ isGenerating ? '生成中...' : '🤖 AI 评论' }}
+              </button>
+
               <button class="cm-close-btn" @click="$emit('close')" title="关闭">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -285,7 +297,7 @@ function getAiTagName(tag) {
 
 // === 数据加载与删除 ===
 watch(() => [props.visible, props.song?.id], async ([visible, songId]) => {
-  if (visible && songId) await loadComments(songId)
+  if (visible && songId) await loadComments(props.song.id)
 })
 
 async function loadComments(songId) {
@@ -374,6 +386,30 @@ function formatTime(ts) {
   if (!ts) return ''
   return new Date(ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+
+/* AI乐评 */
+const isGenerating = ref(false)
+const authStore = useAuthStore()
+async function generateAiComment() {
+  if (!props.song?.id || isGenerating.value) return
+  isGenerating.value = true
+  try {
+    await $fetch(`/api/admin/comments/generate/${props.song.id}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authStore.token}` }
+    })
+    // 刷新评论列表
+    await loadComments(props.song.id)
+  } catch (e) {
+    console.error('AI 评论生成失败', e)
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+
+
 </script>
 
 <style scoped>
@@ -566,6 +602,31 @@ function formatTime(ts) {
 
 .batch-delete-btn:disabled {
   opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* AI乐评人 */
+.ai-generate-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.ai-generate-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.4);
+  color: white;
+}
+.ai-generate-btn:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
