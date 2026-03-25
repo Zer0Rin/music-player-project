@@ -1,6 +1,6 @@
 # 🎵 MusicPlayer
 
-by 古月素星
+
 
 <div align="center">
 
@@ -332,8 +332,12 @@ Spring Data JPA 使用 `ddl-auto: update` 自动维护表结构。
 
 本项目基于 [MIT License](LICENSE) 开源。
 
+
 ---
 
 <div align="center">
 Made with ❤️ and 🎵
 </div>
+
+
+by 古月素星
