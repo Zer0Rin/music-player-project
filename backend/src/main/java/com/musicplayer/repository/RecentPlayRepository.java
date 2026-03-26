@@ -22,4 +22,6 @@ public interface RecentPlayRepository extends JpaRepository<RecentPlay, String> 
 
     long countBySongId(String songId);
 
+    List<RecentPlay> findByUserIdOrderByPlayedAtDesc(String userId);
+
 }

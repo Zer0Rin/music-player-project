@@ -145,6 +145,32 @@
               <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
             </button>
             <div class="hot-scroll" ref="hotScrollRef" @scroll="updateArrows">
+
+              <!-- 日推歌单卡片 -->
+              <div v-if="dailyRecommend?.songs?.length"
+                   class="hot-card liquid-card daily-card"
+                   @click="playDailyRecommend">
+                <div class="hot-cover-wrap">
+                  <img v-if="dailyRecommend.songs[0]"
+                       :src="coverUrl(dailyRecommend.songs[0].id)"
+                       class="hot-cover daily-cover" />
+                  <div class="daily-overlay">
+                    <div class="daily-icon">✨</div>
+                    <div class="daily-label">今日推荐</div>
+                  </div>
+                  <div class="hot-play-overlay">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="hot-info">
+                  <div class="hot-song-title">今日为你推荐</div>
+                  <div class="hot-song-artist">{{ dailyRecommend.songs.length }} 首歌曲</div>
+                </div>
+              </div>
+
+              <!-- 热度推荐 -->
               <div v-for="pl in hotPlaylists" :key="'pl-'+pl.id" class="hot-card liquid-card" @click="navToPlaylist(pl)">
                 <div class="hot-cover-wrap">
                   <img v-if="pl.coverImage" :src="`/api/playlists/${pl.id}/cover`" class="hot-cover" />
@@ -452,12 +478,19 @@ const hotScrollRef = ref(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 
+
+const dailyRecommend = ref(null) // { date, songs[] }    日推
 onMounted(async () => {
   try {
     const data = await $apiFetch('/api/hot')
     hotPlaylists.value = data.playlists || []
     hotSongs.value = data.songs || []
     nextTick(() => updateArrows())
+  } catch {}
+
+  // 加载日推
+  try {
+    dailyRecommend.value = await $apiFetch('/api/daily/recommend')
   } catch {}
 })
 
@@ -483,6 +516,16 @@ function playHotSong(song) {
 
 /* 下载 歌单 */
 const { downloadSong, downloadPlaylist } = useDownload()
+
+
+/* 日推 */
+function playDailyRecommend() {
+  if (!dailyRecommend.value?.songs?.length) return
+  // 直接用日推返回的歌曲数据，字段已经够用（id/title/artist/coverFile）
+  const songs = dailyRecommend.value.songs
+  store.setPlaylist([...songs])
+  store.playSong(songs[0], 0)
+}
 
 
 </script>
@@ -1074,6 +1117,37 @@ const { downloadSong, downloadPlaylist } = useDownload()
   color: var(--text-tertiary);
   white-space: nowrap;
 }
+
+
+/* 日推 */
+.daily-card {
+  position: relative;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+.daily-cover {
+  filter: brightness(0.7);
+}
+.daily-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.daily-icon {
+  font-size: 22px;
+}
+.daily-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  letter-spacing: 0.05em;
+}
+
 
 
 </style>

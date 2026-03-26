@@ -167,12 +167,16 @@ onMounted(async () => {
   try {
     const { $apiFetch } = useNuxtApp()
     await store.refreshSongs($apiFetch)
+
+    // 加载完歌曲后，如果当前是全部歌曲视图，主动初始化播放列表
+    if (!plStore.activePlaylistId) {
+      store.setPlaylist([...store.allSongs])
+    }
   } catch (err) {
     console.error('加载歌曲列表失败:', err)
   }
 
   await loadHotSongs()
-
   await plStore.fetchPlaylists()
   await store.fetchRecentSongs()
 

@@ -88,6 +88,9 @@ public class SecurityConfig {
                         // 热度刷新
                         .requestMatchers("/api/hot/refresh").hasRole("ADMIN")
 
+                        //日推歌单
+                        .requestMatchers("/api/daily/recommend").authenticated()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
