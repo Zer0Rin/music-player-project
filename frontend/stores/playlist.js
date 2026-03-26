@@ -4,6 +4,10 @@ export const usePlaylistStore = defineStore('playlist', {
     state: () => ({
         playlists: [],
         activePlaylistId: null,  // 当前查看的歌单（null = 全部歌曲）
+
+        //日推歌单
+        virtualPlaylist: null,
+        virtualPlaylistSongs: [],
     }),
 
     getters: {
@@ -22,7 +26,11 @@ export const usePlaylistStore = defineStore('playlist', {
             // 如果没选中任何歌单 (比如点击了主页的"全部歌曲")
             if (!state.activePlaylistId) return null
 
-            // 💡 核心修复：拦截特殊的 'favorites' 暗号，直接返回系统的"我喜欢"歌单
+            if (state.activePlaylistId === 'daily-recommend') {
+                return state.virtualPlaylist
+            }
+
+            // 拦截特殊的 'favorites' 暗号，直接返回系统的"我喜欢"歌单
             if (state.activePlaylistId === 'favorites') {
                 return state.playlists.find(p => p.system === true || p.isSystem === true)
             }
@@ -219,5 +227,15 @@ export const usePlaylistStore = defineStore('playlist', {
             await this.fetchPlaylists()
             return pl  // 返回后端的原始歌单对象（有 id）
         },
+
+
+        // 日推歌单
+        setVirtualPlaylist(playlist, songs) {
+            this.virtualPlaylist = playlist
+            this.virtualPlaylistSongs = songs
+            this.activePlaylistId = 'daily-recommend'
+        },
+
+
     },
 })

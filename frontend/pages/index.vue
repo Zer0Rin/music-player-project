@@ -186,9 +186,13 @@ onMounted(async () => {
 onUnmounted(() => { window.removeEventListener('keydown', onGlobalKey) })
 
 const displaySongs = computed(() => {
-  // 特殊视图不计算
   const id = plStore.activePlaylistId
   if (id === 'recent' || id === 'community' || id === 'profile') return []
+
+  // 日推虚拟歌单
+  if (id === 'daily-recommend') {
+    return plStore.virtualPlaylistSongs
+  }
 
   const playlist = plStore.activePlaylist
   if (!playlist) return allSongs.value

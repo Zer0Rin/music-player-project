@@ -521,10 +521,24 @@ const { downloadSong, downloadPlaylist } = useDownload()
 /* 日推 */
 function playDailyRecommend() {
   if (!dailyRecommend.value?.songs?.length) return
-  // 直接用日推返回的歌曲数据，字段已经够用（id/title/artist/coverFile）
-  const songs = dailyRecommend.value.songs
-  store.setPlaylist([...songs])
-  store.playSong(songs[0], 0)
+
+  // 构造虚拟歌单对象
+  const virtualPlaylist = {
+    id: 'daily-recommend',
+    name: '今日为你推荐',
+    description: '根据你的音乐口味，今天为你精选的歌曲',
+    isSystem: true,
+    songIds: dailyRecommend.value.songs.map(s => s.id),
+    creatorName: 'AI 推荐引擎',
+  }
+
+  // 把日推歌曲注入到 allSongs（确保能在歌单视图里找到）
+  const songs = dailyRecommend.value.songs.map(s => {
+    return store.allSongs.find(ps => ps.id === s.id) || s
+  }).filter(Boolean)
+
+  // 切换到日推歌单视图
+  plStore.setVirtualPlaylist(virtualPlaylist, songs)
 }
 
 
