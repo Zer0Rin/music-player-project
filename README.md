@@ -32,6 +32,7 @@
 - 逐字 / 逐行两种高亮模式自动切换
 - 准星点击歌词跳转播放，鼠标滚轮自由浏览
 - 沉浸式全屏歌词界面（LiquidUI 玻璃拟物风）
+<img width="2555" height="1183" alt="image" src="https://github.com/user-attachments/assets/a1e3b410-96c9-45bb-8b3b-3d5a353be915" />
 
 ### 🤖 AI 能力 / AI Features
 - **AI DJ**：根据用户输入语境智能生成歌单，搜索本地曲库匹配
