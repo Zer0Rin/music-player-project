@@ -34,6 +34,10 @@
 - 沉浸式全屏歌词界面（LiquidUI 玻璃拟物风）
 <img width="2555" height="1183" alt="image" src="https://github.com/user-attachments/assets/a1e3b410-96c9-45bb-8b3b-3d5a353be915" />
 
+- 沉浸式全屏歌词界面（AMLL -https://github.com/amll-dev/applemusic-like-lyrics/tree/full-refractor）
+<img width="2141" height="1195" alt="image" src="https://github.com/user-attachments/assets/2cf63ef7-5994-4d16-8cb8-7d9fcd2952db" />
+
+
 ### 🤖 AI 能力 / AI Features
 - **AI DJ**：根据用户输入语境智能生成歌单，搜索本地曲库匹配
 - **AI 歌曲解析**：SSE 流式输出，打字机效果，Markdown 渲染，分析情感基调 / 歌词意境 / 金句赏析 / 创作视角
