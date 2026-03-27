@@ -1,4 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
+
 export default defineNuxtConfig({
   devtools: { enabled: true },
 
@@ -37,6 +40,23 @@ export default defineNuxtConfig({
     display: 'swap',
   },
 
+    vite: {
+        plugins: [
+            nodePolyfills({
+                include: ['url', 'buffer', 'process'],
+            }),
+        ],
+        optimizeDeps: {
+            include: [
+                '@applemusic-like-lyrics/core',
+                'eventemitter3',
+            ],
+        },
+        ssr: {
+            noExternal: ['@applemusic-like-lyrics/core']
+        }
+    },
+
   // 开发时代理后端 API，避免 CORS 问题
   nitro: {
     devProxy: {
@@ -47,6 +67,8 @@ export default defineNuxtConfig({
       },
     },
   },
+
+
 
     runtimeConfig: {
         public: {

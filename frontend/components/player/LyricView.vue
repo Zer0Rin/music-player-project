@@ -1,7 +1,7 @@
 <template>
   <Transition name="lyric-view">
-    <div v-if="store.showLyricView" class="lyric-overlay">
-      <FluidBackground />
+    <div v-if="store.showLyricView" :key="lyricViewKey" class="lyric-overlay">
+      <div ref="bgRef" class="amll-bg-container" />
 
       <button class="close-btn" @click="close" title="关闭 (Esc)">
         <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
@@ -12,31 +12,28 @@
       <div class="lyric-content">
         <div class="left-panel">
 
-          <div class="interactive-area" @click="toggleFlip">
-            <Transition name="fade-flip">
-              <div v-show="!isMobile || !isFlipped" class="cover-container">
-                <img
-                    v-if="store.currentSong"
-                    :src="coverUrl(store.currentSong.id)"
-                    class="cover-img"
-                    @error="e => e.target.style.visibility = 'hidden'"
-                />
-              </div>
-            </Transition>
-
-            <Transition name="fade-flip">
-              <div v-if="isMobile && isFlipped" class="mobile-lyrics-container">
-                <LyricsDisplay @seek="onSeek" />
-              </div>
-            </Transition>
+          <!-- 封面区域：移动端点击翻到歌词 -->
+          <div
+              class="cover-wrapper"
+              :class="{ 'cover-hidden': isMobile && isFlipped }"
+              @click="flipToLyrics"
+          >
+            <div class="cover-container">
+              <img
+                  v-if="store.currentSong"
+                  :src="coverUrl(store.currentSong.id)"
+                  class="cover-img"
+                  @error="e => e.target.style.visibility = 'hidden'"
+              />
+            </div>
           </div>
 
           <AudioVisualizer
-            :width="420"
-            :height="56"
-            class="visualizer"
-            v-show="!isMobile || !isFlipped"
-        />
+              :width="420"
+              :height="56"
+              class="visualizer"
+              v-show="!isMobile || !isFlipped"
+          />
 
           <div class="bottom-controls-wrap">
             <div class="track-info" v-if="store.currentSong">
@@ -119,11 +116,17 @@
           </div>
         </div>
 
-        <div v-if="!isMobile" class="right-panel">
-          <LyricsDisplay @seek="onSeek" />
+        <!-- 歌词容器：PC 端固定在右侧，移动端绝对定位覆盖整个 left-panel -->
+        <!-- 始终渲染，不用 v-if，AMLL 只初始化一次，touch 事件永远有效 -->
+        <div
+            class="lyrics-panel"
+            :class="{ 'lyrics-panel--visible': !isMobile || isFlipped }"
+        >
+          <div ref="lyricsRef" class="amll-lyrics-container" />
         </div>
       </div>
-      <!-- 歌曲详情小窗 — 移到 lyric-overlay 直接子级 -->
+
+      <!-- 歌曲详情小窗 -->
       <Transition name="info-pop">
         <div v-if="showSongInfo" class="song-info-popup" @click.self="showSongInfo = false">
           <div class="song-info-panel">
@@ -139,54 +142,30 @@
               <img v-if="store.currentSong" :src="coverUrl(store.currentSong.id)" class="info-cover-img" />
             </div>
             <div class="info-rows" v-if="store.currentSong">
-              <div class="info-row">
-                <span class="info-label">标题</span>
-                <span class="info-value">{{ store.currentSong.title || '—' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">艺术家</span>
-                <span class="info-value">{{ store.currentSong.artist || '—' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">专辑</span>
-                <span class="info-value">{{ store.currentSong.album || '—' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">流派</span>
-                <span class="info-value">{{ store.currentSong.genre || '—' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">年份</span>
-                <span class="info-value">{{ store.currentSong.year || '—' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">时长</span>
-                <span class="info-value">{{ store.formattedDuration }}</span>
-              </div>
+              <div class="info-row"><span class="info-label">标题</span><span class="info-value">{{ store.currentSong.title || '—' }}</span></div>
+              <div class="info-row"><span class="info-label">艺术家</span><span class="info-value">{{ store.currentSong.artist || '—' }}</span></div>
+              <div class="info-row"><span class="info-label">专辑</span><span class="info-value">{{ store.currentSong.album || '—' }}</span></div>
+              <div class="info-row"><span class="info-label">流派</span><span class="info-value">{{ store.currentSong.genre || '—' }}</span></div>
+              <div class="info-row"><span class="info-label">年份</span><span class="info-value">{{ store.currentSong.year || '—' }}</span></div>
+              <div class="info-row"><span class="info-label">时长</span><span class="info-value">{{ store.formattedDuration }}</span></div>
               <div class="info-row">
                 <span class="info-label">下载</span>
                 <button class="download-song-btn" @click="downloadCurrentSong">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                  </svg>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                   下载此歌曲
                 </button>
               </div>
               <div class="info-row">
                 <span class="info-label">AI 解析</span>
                 <button class="download-song-btn ai-analysis-btn" @click="openAiAnalysis">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V15a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 11H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 16.93z"/>
-                  </svg>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V15a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 11H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 16.93z"/></svg>
                   AI 歌曲解析
                 </button>
               </div>
               <div class="info-row">
                 <span class="info-label">定时器</span>
                 <button class="download-song-btn ai-analysis-btn" @click="openSleepTimer">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
-                  </svg>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
                   睡眠定时器
                 </button>
               </div>
@@ -195,71 +174,73 @@
         </div>
       </Transition>
 
-      <!-- AI 解析面板 -->
       <AiSongAnalysis
           :visible="showAiAnalysis"
           :song-id="store.currentSong?.id"
           @close="showAiAnalysis = false"
       />
 
-      <!-- 睡眠定时 -->
       <SleepTimer
           :visible="showSleepTimer"
           @close="showSleepTimer = false"
       />
 
-    </div><!-- lyric-overlay 结束 -->
+    </div>
   </Transition>
   <CommentPanel :visible="showComment" @close="showComment = false" />
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import FluidBackground from './FluidBackground.vue'
 import AudioVisualizer from './AudioVisualizer.vue'
-import LyricsDisplay from '~/components/lyrics/LyricsDisplay.vue'
-// 引入评论面板
 import CommentPanel from '~/components/player/CommentPanel.vue'
-
-// AI 歌曲解析
 import AiSongAnalysis from '~/components/player/AiSongAnalysis.vue'
-
-// 睡眠模式
 import SleepTimer from '~/components/player/SleepTimer.vue'
+import { useAMLLEngine } from '~/composables/useAMLLEngine'
+import { useAMLLBackground } from '~/composables/useAMLLBackground'
+
 const showSleepTimer = ref(false)
 function openSleepTimer() {
   showSongInfo.value = false
   setTimeout(() => { showSleepTimer.value = true }, 300)
 }
 
-// 假设这些是你原本定义的 composables
 const store = usePlayerStore()
 const plStore = usePlaylistStore()
 const { coverUrl } = useCoverUrl()
 const emit = defineEmits(['seek', 'volume'])
 
-// 屏幕尺寸检测与翻转状态
+const { initPlayer, seekTo, dispose: disposeEngine } = useAMLLEngine()
+const { initRenderer, dispose: disposeBg } = useAMLLBackground()
+
+const lyricsRef = ref(null)
+const bgRef = ref(null)
+
+// lyricsRef 始终渲染，watch 到 el 时初始化一次即可
+watch(lyricsRef, (el) => { if (el) initPlayer(el) })
+watch(bgRef, (el) => { if (el) initRenderer(el) })
+
 const isMobile = ref(false)
-const isFlipped = ref(false) // 移动端控制封面和歌词的切换
+const isFlipped = ref(false)
 const showComment = ref(false)
-
-// 设置/详细信息
 const showSongInfo = ref(false)
-
-// AI歌词解析
 const showAiAnalysis = ref(false)
 
-function toggleFlip() {
-  if (isMobile.value) {
-    isFlipped.value = !isFlipped.value
+// 移动端点封面 → 切到歌词视图
+function flipToLyrics() {
+  if (isMobile.value && !isFlipped.value) {
+    isFlipped.value = true
   }
+}
+
+// 移动端歌词视图 → 切回封面（close-btn 长按或其他手势可触发）
+function flipToCover() {
+  if (isMobile.value) isFlipped.value = false
 }
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768
-  if (!isMobile.value) {
-    isFlipped.value = false // 切回 PC 时重置状态
-  }
+  if (!isMobile.value) isFlipped.value = false
 }
 
 const eschandler = (e) => { if (e.key === 'Escape') close() }
@@ -268,14 +249,15 @@ onMounted(() => {
   window.addEventListener('resize', checkMobile)
   window.addEventListener('keydown', eschandler)
 })
-
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
   window.removeEventListener('keydown', eschandler)
   clearTimeout(modeTipTimer)
+  disposeEngine()
+  disposeBg()
 })
 
-// === 以下是你原有的拖动逻辑，保持不变 ===
+// 进度条拖动
 const progRef = ref(null)
 const volRef = ref(null)
 const showModeTip = ref(false)
@@ -294,6 +276,7 @@ function onProgTouchEnd() { window.removeEventListener('touchmove', onProgTouchM
 function updateDragFromEvent(e) { const rect = progRef.value.getBoundingClientRect(); const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)); dragTime.value = ratio * store.duration }
 function updateDragFromTouch(e) { const touch = e.touches[0]; const rect = progRef.value.getBoundingClientRect(); const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width)); dragTime.value = ratio * store.duration }
 
+// 音量拖动
 const volDragging = ref(false)
 const volDragVal = ref(0)
 const volDisplay = computed(() => volDragging.value ? volDragVal.value : store.volume)
@@ -311,74 +294,59 @@ const playModeLabel = computed(() => ({ 'sequence': '顺序播放', 'loop-all': 
 watch(() => store.playMode, () => { showModeTip.value = true; clearTimeout(modeTipTimer); modeTipTimer = setTimeout(() => { showModeTip.value = false }, 1500) })
 
 function close() { store.closeLyricView() }
-function onSeek(time) { emit('seek', time) }
+function onSeek(time) { emit('seek', time); seekTo(time) }
 function formatTime(s) { if (!s || isNaN(s)) return '0:00'; return Math.floor(s / 60) + ':' + Math.floor(s % 60).toString().padStart(2, '0') }
 
-
-/* 下载单曲 */
 const { downloadSong } = useDownload()
+function downloadCurrentSong() { downloadSong(store.currentSong); showSongInfo.value = false }
 
-function downloadCurrentSong() {
-  downloadSong(store.currentSong)
-  showSongInfo.value = false
-}
-
-
-/* 歌词AI解析 */
 function openAiAnalysis() {
   showSongInfo.value = false
-  setTimeout(() => {
-    console.log('opening AI analysis, songId:', store.currentSong?.id)
-    showAiAnalysis.value = true
-  }, 300)
+  setTimeout(() => { showAiAnalysis.value = true }, 300)
 }
 
-
-
+const lyricViewKey = ref(0)
+watch(() => store.showLyricView, (val) => {
+  if (val) {
+    lyricViewKey.value++
+  } else {
+    disposeEngine()
+    disposeBg()
+  }
+})
 </script>
 
 <style scoped>
-/* 原有的全局和基础样式保持不变 */
 .lyric-overlay {
   position: fixed;
   inset: 0;
   z-index: 999;
   background: #000;
   overflow: hidden;
-
-  /* 隔离外部的白天模式影响 */
-  color-scheme: dark; /* 强制浏览器原生元素（如滚动条）使用暗色主题 */
-  color: #ffffff;     /* 兜底：强制基础字体颜色为纯白 */
-
-  /* 强制重置 CSS 变量：
-     即使外面是白天模式，只要进入这个容器，所有的子组件 (包括 LyricsDisplay)
-     读取到的变量都会强制变成黑夜状态下的颜色！*/
+  color-scheme: dark;
+  color: #ffffff;
   --text-primary: #ffffff !important;
   --text-secondary: rgba(255, 255, 255, 0.7) !important;
   --text-tertiary: rgba(255, 255, 255, 0.4) !important;
-  /* 如果你的白天模式修改了强调色（比如爱心变色了），在这里也强制重置回来 */
   --accent: #fa2d48 !important;
 }
-
-
 
 .mode-btn { background: transparent !important; border: none !important; outline: none; box-shadow: none !important; color: rgba(255, 255, 255, 0.6); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 50%; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .mode-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.1) !important; transform: scale(1.15); }
 .close-btn { position: absolute; top: 20px; left: 24px; z-index: 50; background: transparent; border: none; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-fast); }
 .close-btn:hover { color: #fff; transform: translateY(4px); }
 
-/* 加上 box-sizing: border-box，确保 100% 高度包含了 padding，绝不溢出 */
 .lyric-content {
-  box-sizing: border-box; /* 极度重要！ */
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
-  height: 100%; /* 保持 100% 全屏 */
+  height: 100%;
   display: flex;
-  padding: 40px 0; /* PC 默认 padding 保持不动 */
-  overflow: hidden; /* 我们争取不产生内部滚动，通过动态缩小封面解决 */
+  padding: 40px 0;
+  overflow: hidden;
 }
 
-/* PC端左侧布局 */
+/* ── PC 端左侧 ── */
 .left-panel {
   margin-left: 10%;
   width: 30%;
@@ -388,49 +356,54 @@ function openAiAnalysis() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* 改为顶部对齐 */
-  padding-top: 2vh; /* 顶部预留一点点呼吸空间 */
-  box-sizing: border-box; /* 确保 padding 在内部 */
-  height: 100%; /* 确保填满父容器被压缩后的高度 */
-  gap: 0; /* 我们将通过 margin 精准控制空间瓜分 */
+  justify-content: flex-start;
+  padding-top: 2vh;
+  box-sizing: border-box;
+  height: 100%;
+  gap: 0;
   position: relative;
 }
-.interactive-area {
-  width: min(420px, 95%, 38vh); /* Ruler 变得更聪明，永远比控制台小 */
+
+/* cover-wrapper: PC端占正方形空间，移动端可缩小 */
+.cover-wrapper {
+  width: min(420px, 95%, 38vh);
   aspect-ratio: 1 / 1;
   position: relative;
-  flex-shrink: 0; /* 不允许被压缩变形 */
+  flex-shrink: 0;
   cursor: pointer;
-  /* auto 会将下面的组件全家，无情推到 `.left-panel` 的最底部。实现完美的 Apple Music 上下分布手感。 */
   margin-bottom: auto;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
+
 .cover-container {
-  position: absolute;  /* 关键：剥夺它撑开父容器的权利 */
-  inset: 0;            /* 相当于 top:0; bottom:0; left:0; right:0; 完美填满 */
+  position: absolute;
+  inset: 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
 }
+
 .cover-img {
   width: 100%;
   height: 100%;
   object-fit: cover !important;
   display: block;
 }
+
 .bottom-controls-wrap {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 缩小全局间距从 18px 到 12px。寸土寸金！ */
   gap: 12px;
 }
+
 .track-info { text-align: center; width: min(420px, 95%); padding: 4px 0 0; }
 .track-title { font-size: 27px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .track-artist { font-size: 21px; color: rgba(255, 255, 255, 0.5); margin-top: 5px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
 
-/* 进度条与控制台 (保持你原有的精美样式) */
 .progress-area { width: min(420px, 95%); }
 .progress-bar { position: relative; height: 28px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
 .progress-bg { position: absolute; left: 0; right: 0; height: 5px; background: rgba(255, 255, 255, 0.15); border-radius: 3px; top: 50%; transform: translateY(-50%); transition: height 0.15s ease; }
@@ -439,6 +412,7 @@ function openAiAnalysis() {
 .progress-bar:hover .progress-dot, .progress-bar:active .progress-dot { transform: translate(-50%, -50%) scale(1); }
 .progress-bar:hover .progress-bg, .progress-bar:active .progress-bg, .progress-bar:hover .progress-fill, .progress-bar:active .progress-fill { height: 7px; }
 .progress-times { display: flex; justify-content: space-between; margin-top: 5px; font-size: 13px; color: rgba(255, 255, 255, 0.35); font-variant-numeric: tabular-nums; }
+
 .controls-row { display: flex; align-items: center; justify-content: space-between; width: min(420px, 95%); }
 .ctrl-side { display: flex; align-items: center; gap: 4px; }
 .fn-btn { background: none; border: none; color: rgba(255, 255, 255, 0.4); cursor: pointer; padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all var(--transition-fast); }
@@ -449,6 +423,7 @@ function openAiAnalysis() {
 .ctrl-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 .play-btn { width: 72px; height: 72px; background: rgba(255, 255, 255, 0.9); color: #000 !important; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2); }
 .play-btn:hover { background: #fff !important; transform: scale(1.06) !important; }
+
 .volume-row { display: flex; align-items: center; gap: 10px; width: min(420px, 95%); }
 .vol-icon { color: rgba(255, 255, 255, 0.35); flex-shrink: 0; }
 .vol-track { flex: 1; height: 24px; position: relative; display: flex; align-items: center; cursor: pointer; touch-action: none; }
@@ -457,115 +432,54 @@ function openAiAnalysis() {
 .vol-dot { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%) scale(0); transition: transform 0.15s ease; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); z-index: 2; }
 .vol-track:hover .vol-dot, .vol-track:active .vol-dot { transform: translate(-50%, -50%) scale(1); }
 
-/* PC端右侧面板 */
-.right-panel { position: absolute; left: 48%; width: 45%; top: 40px; bottom: 40px; overflow: hidden; }
+/* ── 歌词面板（PC + 移动端统一） ── */
+.lyrics-panel {
+  /* PC端：右侧固定区域 */
+  position: absolute;
+  left: 48%;
+  width: 45%;
+  top: 40px;
+  bottom: 40px;
+  overflow: hidden;
+  /* 默认对 PC 端可见，移动端靠 class 控制 */
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.35s ease;
+}
 
-/* 切换动画 */
-.fade-flip-enter-active, .fade-flip-leave-active { transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); position: absolute; inset: 0; }
-.fade-flip-enter-from { opacity: 0; transform: scale(0.95); }
-.fade-flip-leave-to { opacity: 0; transform: scale(1.05); }
+/* 移动端：默认隐藏，isFlipped 时显示 */
+/* 通过 JS class 控制，不依赖 media query，避免和 PC 端冲突 */
+.lyrics-panel:not(.lyrics-panel--visible) {
+  /* 只在移动端生效的隐藏状态由 JS 控制 class 决定 */
+}
 
-
-
-
-/* =========================================
-   🎵 歌曲信息与操作区 (PC端：文字绝对正中，按钮悬浮靠右)
-   ========================================= */
-
-/* 1. 外层容器：相对定位，作为按钮的参照物 */
+/* ── PC 端歌曲信息布局 ── */
 .track-info {
   position: relative;
   display: flex !important;
-  justify-content: center; /* 整体居中 */
-  align-items: center;     /* 垂直居中 */
+  justify-content: center;
+  align-items: center;
   width: min(420px, 95%);
   margin: 0 auto;
-  min-height: 70px; /* 给定一个最小高度，保证布局稳定 */
+  min-height: 70px;
 }
-
-/* 2. 文字区域：左右对称防撞，保证视觉绝对居中 */
 .track-meta {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   width: 100%;
-  padding: 0 ;
   box-sizing: border-box;
 }
+.track-title, .track-artist { width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-title { padding: 0 16px; box-sizing: border-box; font-size: 27px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.track-artist { padding: 0 90px; box-sizing: border-box; font-size: 21px; color: rgba(255, 255, 255, 0.5); margin-top: 5px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.track-actions { position: absolute; right: 0; top: auto; bottom: -6px; height: auto; display: flex; align-items: center; gap: 8px; }
+.track-fav-btn, .track-comment-btn { background: none; border: none; color: rgba(255, 255, 255, 0.4); cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.track-fav-btn:hover, .track-comment-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.1); transform: scale(1.15) translateY(-2px); }
+.track-fav-btn.fav-active { color: var(--accent); filter: drop-shadow(0 0 8px rgba(250, 45, 72, 0.5)); }
 
-.track-title,
-.track-artist {
-  width: 100%; /* 填满安全区，超长自动截断 */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.track-title {
-  width: 100%;
-  padding: 0 16px; /* 歌名有极大展示空间，仅保留边缘防撞 */
-  box-sizing: border-box;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 27px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.track-artist {
-  width: 100%;
-  padding: 0 90px; /* 仅歌手行左右留出 90px，为操作按钮让出空间，同时保证自身视觉居中 */
-  box-sizing: border-box;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 21px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 5px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* 3. 右侧按钮区 (❤ 和 💬)：解除垂直居中，下沉对齐到歌手行 */
-.track-actions {
-  position: absolute;
-  right: 0;
-  top: auto;
-  bottom: -6px;   /* 吸附到底部，-6px 用来抵消按钮自身的 padding，使图标中心与文字中心绝对齐平 */
-  height: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-/* 按钮基础样式与悬浮反馈 */
-.track-fav-btn,
-.track-comment-btn {
-  background: none; border: none;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer; padding: 8px;
-  border-radius: 50%; display: flex;
-  align-items: center; justify-content: center;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.track-fav-btn:hover,
-.track-comment-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.15) translateY(-2px);
-}
-
-.track-fav-btn.fav-active {
-  color: var(--accent);
-  filter: drop-shadow(0 0 8px rgba(250, 45, 72, 0.5));
-}
-
-
-/* =========================================
-   📱 移动端沉浸式单列布局 (Apple Music 风格)
-   ========================================= */
+/* ── 移动端 ── */
 @media (max-width: 768px) {
   .lyric-content {
     box-sizing: border-box;
@@ -582,82 +496,91 @@ function openAiAnalysis() {
     justify-content: flex-start; display: flex; flex-direction: column;
   }
 
-  .interactive-area {
-    width: 100%; flex: 1; min-height: 0; display: flex;
-    align-items: center; justify-content: center; margin-bottom: 16px;
+  /* 封面wrapper：移动端占据 flex 空间，切换到歌词时缩到左上角 */
+  .cover-wrapper {
+    width: 100%;
+    aspect-ratio: unset;
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
   }
 
   .cover-container {
-    width: min(85vw, 45dvh, 360px); aspect-ratio: 1; border-radius: 12px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); margin: 0 auto;
+    position: relative;
+    inset: unset;
+    width: min(85vw, 45dvh, 360px);
+    height: min(85vw, 45dvh, 360px);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2), 0 6px 16px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
-  .mobile-lyrics-container {
-    width: 100%; height: 100%; overflow: hidden;
-    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
-    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  /* 封面隐藏态：缩到左上角小图 */
+  .cover-wrapper.cover-hidden {
+    flex: 0;
+    min-height: 0;
+    margin-bottom: 0;
+    width: 100%;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
   }
 
+  /* 歌词面板：移动端绝对定位覆盖 left-panel 的主体区域 */
+  .lyrics-panel {
+    position: absolute;
+    /* 从 left-panel 的顶部到底部控制区上方 */
+    top: 50px;   /* 与 lyric-content 的 padding-top 对齐 */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    /* 遮罩渐变边缘 */
+    mask-image: linear-gradient(to bottom, transparent, black 8%, black 92%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 8%, black 92%, transparent);
+    /* 默认隐藏 */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+    z-index: 5;
+  }
+
+  /* 歌词显示态 */
+  .lyrics-panel.lyrics-panel--visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 底部控制区在歌词态时仍然可见 */
   .bottom-controls-wrap {
     width: 100%; gap: 12px; margin-top: auto; flex-shrink: 0;
+    position: relative;
+    z-index: 6;
   }
 
-  /* 💡 修复移动端歌曲信息区布局：文字在左，按钮绝对定位在右 */
   .track-info {
     display: flex !important;
     text-align: left;
     width: 100%; max-width: none; padding: 0;
     position: relative;
-    flex-direction: column !important; /* 手机端恢复纵向结构 */
+    flex-direction: column !important;
     justify-content: center;
-    align-items: flex-start !important; /* 靠左对齐 */
-  }
-
-  .track-meta {
-    text-align: left;
-    padding: 0 !important;
     align-items: flex-start !important;
   }
+  .track-meta { text-align: left; padding: 0 !important; align-items: flex-start !important; }
+  .track-title { font-size: 22px; padding: 0 16px 0 0 !important; text-align: left !important; }
+  .track-artist { font-size: 16px; margin-top: 2px; padding: 0 90px 0 0 !important; text-align: left !important; }
+  .track-actions { position: absolute; right: -8px; top: auto; bottom: -8px; transform: none; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 0; }
+  .track-fav-btn, .track-comment-btn { padding: 6px; position: static; transform: none; }
+  .track-fav-btn:hover, .track-comment-btn:hover { transform: scale(1.15); }
 
-  .track-title {
-    width: 100%;
-    font-size: 22px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding-right: 16px; /* 移动端给歌名释放最长空间 */
-  }
-
-  .track-artist {
-    width: 100%;
-    font-size: 16px;
-    margin-top: 2px;
-    padding-right: 90px; /* 仅歌手名右侧留出 90px 给按钮组 */
-  }
-
-  .track-actions {
-    position: absolute;
-    right: -8px;
-    top: auto;
-    bottom: -8px;     /* 吸附到底部，由于手机端文字变小，向下微调 -8px 达到视觉居中对齐 */
-    transform: none;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-    margin-top: 0;
-  }
-
-  /* 确保按钮不干扰外层的布局 */
-  .track-fav-btn, .track-comment-btn {
-    padding: 6px;
-    position: static; /* 撤销原来的绝对定位 */
-    transform: none;
-  }
-  .track-fav-btn:hover, .track-comment-btn:hover {
-    transform: scale(1.15); /* 手机端 hover 只保留轻微缩放，取消 translateY */
-  }
-
-  /* --- 其他底部控制台适配 --- */
   .progress-area, .controls-row, .volume-row { width: 100%; max-width: none; }
   .play-btn { width: 56px; height: 56px; }
   .ctrl-main { gap: 24px; }
@@ -666,9 +589,7 @@ function openAiAnalysis() {
     display: flex; align-items: center; justify-content: center; width: 100%;
     height: 36px; margin: 8px 0 16px; flex-shrink: 0; opacity: 0.8;
   }
-  .visualizer :deep(canvas) {
-    max-width: 80%; height: 100% !important;
-  }
+  .visualizer :deep(canvas) { max-width: 80%; height: 100% !important; }
 
   .close-btn {
     top: 12px; left: 50%; transform: translateX(-50%);
@@ -681,108 +602,38 @@ function openAiAnalysis() {
   }
 }
 
-
-/* 设置/详细信息 */
-.song-info-popup {
-  position: absolute;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(4px);
-}
-
-.song-info-panel {
-  width: 100%;
-  max-width: 480px;
-  background: rgba(20,20,20,0.95);
-  border-radius: 20px 20px 0 0;
-  padding: 20px 24px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.info-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.info-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
-}
-.info-close {
-  background: rgba(255,255,255,0.1);
-  border: none;
-  color: rgba(255,255,255,0.6);
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
-}
+/* ── 歌曲信息弹窗 ── */
+.song-info-popup { position: absolute; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+.song-info-panel { width: 100%; max-width: 480px; background: rgba(20,20,20,0.95); border-radius: 20px 20px 0 0; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 16px; max-height: 80vh; overflow-y: auto; }
+.info-header { display: flex; align-items: center; justify-content: space-between; }
+.info-title { font-size: 15px; font-weight: 700; color: white; }
+.info-close { background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.6); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .info-close:hover { background: rgba(255,255,255,0.2); color: white; }
-
 .info-cover { width: 80px; height: 80px; border-radius: 10px; overflow: hidden; margin: 0 auto; }
 .info-cover-img { width: 100%; height: 100%; object-fit: cover; }
-
 .info-rows { display: flex; flex-direction: column; gap: 0; }
-.info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  gap: 16px;
-}
+.info-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 16px; }
 .info-row:last-child { border-bottom: none; }
 .info-label { font-size: 13px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
 .info-value { font-size: 13px; color: white; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
-.file-name { font-size: 11px; font-family: monospace; color: rgba(255,255,255,0.6); }
-.info-badge { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
-.badge-ok { background: rgba(74,222,128,0.2); color: #4ade80; }
-.badge-no { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
-
 .info-pop-enter-active, .info-pop-leave-active { transition: all 0.3s ease; }
 .info-pop-enter-from, .info-pop-leave-to { opacity: 0; transform: translateY(20px); }
 
-
-/* 下载单曲 */
-.download-song-btn {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 12px; border-radius: 8px; border: none;
-  background: rgba(9, 0, 0, 0.76); color: #8bdcfa;
-  font-size: 12px; cursor: pointer; transition: all 0.2s;
-}
+.download-song-btn { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: none; background: rgba(9, 0, 0, 0.76); color: #8bdcfa; font-size: 12px; cursor: pointer; transition: all 0.2s; }
 .download-song-btn:hover { background: rgba(92, 141, 246, 0.65); }
+.ai-analysis-btn { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
+.ai-analysis-btn:hover { background: rgba(139, 92, 246, 0.35); }
 
-
-/* 歌词ai解析 */
-.ai-analysis-btn {
-  background: rgba(139, 92, 246, 0.15);
-  color: #c4b5fd;
-}
-.ai-analysis-btn:hover {
-  background: rgba(139, 92, 246, 0.35);
-}
-
-
+/* AMLL 容器 */
+.amll-bg-container { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.amll-lyrics-container { width: 100%; height: 100%; overflow: hidden; }
 </style>
 
 <style>
-/* 播放进度条强制锁定纯白透明系 */
 .lyric-progress-bar { position: relative; height: 28px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
 .lyric-progress-bg { position: absolute; left: 0; right: 0; height: 5px; background: rgba(255, 255, 255, 0.15); border-radius: 3px; top: 50%; transform: translateY(-50%); transition: height 0.15s ease; }
 .lyric-progress-fill { position: absolute; left: 0; height: 5px; background: rgba(255, 255, 255, 0.85); border-radius: 3px; top: 50%; transform: translateY(-50%); transition: height 0.15s ease; }
 .lyric-progress-dot { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #ffffff; transform: translate(-50%, -50%) scale(0); transition: transform 0.15s ease; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); z-index: 2; }
-
-/* 悬浮互动效果 */
 .lyric-progress-bar:hover .lyric-progress-dot, .lyric-progress-bar:active .lyric-progress-dot { transform: translate(-50%, -50%) scale(1); }
 .lyric-progress-bar:hover .lyric-progress-bg, .lyric-progress-bar:active .lyric-progress-bg,
 .lyric-progress-bar:hover .lyric-progress-fill, .lyric-progress-bar:active .lyric-progress-fill { height: 7px; }

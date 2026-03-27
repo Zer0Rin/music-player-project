@@ -6,9 +6,16 @@
 // 全局单例：audio 元素和 AudioContext（跨组件共享）
 let _apiBase = null
 let _audio = null
+
+
+
 let _audioCtx = null
 let _analyser = null
 let _sourceNode = null
+
+export function getGlobalAudio() { return _audio }
+export function getGlobalAnalyser() { return _analyser }
+
 let playPromise = null
 
 
@@ -60,6 +67,8 @@ export function useAudioPlayer() {
         }
 
         _audio = new Audio()
+
+
         _audio.crossOrigin = 'anonymous'
         _audio.volume = store.volume
 

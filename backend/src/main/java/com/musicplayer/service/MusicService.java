@@ -89,7 +89,7 @@ public class MusicService {
                 Song existing = dbSongs.get(fileName);
                 if (existing != null) {
                     // 已有歌曲：只更新外部歌词/封面文件关联（不重新读 ID3，避免覆盖用户修改）
-                    String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ttml");
+                    String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ass", ".srt", ".ttml");
                     String coverFile = findFile(Paths.get(musicDataPath, "covers"), baseName, ".jpg", ".png", ".jpeg", ".webp");
                     if (lyricsFile != null) existing.setLyricsFile(lyricsFile);
                     if (coverFile != null) existing.setCoverFile(coverFile);
@@ -136,7 +136,7 @@ public class MusicService {
         }
 
         // 外部歌词和封面文件
-        String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ttml");
+        String lyricsFile = findFile(Paths.get(musicDataPath, "lyrics"), baseName, ".lrc", ".elrc", ".ass", ".srt", ".ttml");
         String coverFile = findFile(Paths.get(musicDataPath, "covers"), baseName, ".jpg", ".png", ".jpeg", ".webp");
 
         // 默认值（文件名做标题）
