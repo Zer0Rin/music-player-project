@@ -28,10 +28,14 @@ public class RecentPlayController {
 
     // 记录播放
     @PostMapping("/{songId}")
-    public ResponseEntity<?> recordPlay(@PathVariable String songId, Authentication auth) {
+    public ResponseEntity<?> recordPlay(
+            @PathVariable String songId,
+            @RequestParam(required = false, defaultValue = "0") Integer playDuration,
+            @RequestParam(required = false, defaultValue = "false") Boolean skipped,
+            Authentication auth) {
+
         String userId = auth.getName();
 
-        // 已存在则更新时间，不存在则新建
         RecentPlay record = recentPlayRepository
                 .findByUserIdAndSongId(userId, songId)
                 .orElseGet(() -> {
@@ -43,9 +47,10 @@ public class RecentPlayController {
                 });
 
         record.setPlayedAt(LocalDateTime.now());
+        record.setPlayDuration(playDuration);
+        record.setSkipped(skipped);
         recentPlayRepository.save(record);
 
-        // 超过100条删除最旧的
         if (recentPlayRepository.countByUserId(userId) > MAX_RECENT) {
             recentPlayRepository.deleteOldestByUserId(userId);
         }

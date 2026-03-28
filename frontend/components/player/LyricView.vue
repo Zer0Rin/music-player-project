@@ -3,7 +3,11 @@
     <div v-if="store.showLyricView" :key="lyricViewKey" class="lyric-overlay">
       <div ref="bgRef" class="amll-bg-container" />
 
-      <button class="close-btn" @click="close" title="关闭 (Esc)">
+      <button
+          class="close-btn"
+          :class="{ 'close-btn--back': isMobile && isFlipped }"
+          @click="isMobile && isFlipped ? flipToCover() : close()"
+      >
         <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
           <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>
         </svg>
@@ -121,6 +125,8 @@
         <div
             class="lyrics-panel"
             :class="{ 'lyrics-panel--visible': !isMobile || isFlipped }"
+            @touchstart.passive="onLyricsPanelTouchStart"
+            @touchend.passive="onLyricsPanelTouchEnd"
         >
           <div ref="lyricsRef" class="amll-lyrics-container" />
         </div>
@@ -314,6 +320,28 @@ watch(() => store.showLyricView, (val) => {
     disposeBg()
   }
 })
+
+
+/* 移动端手势调用 */
+// 已有的 flipToCover 不动，补上手势检测
+let lyricsPanelTouchStartY = 0
+let lyricsPanelTouchStartTime = 0
+
+function onLyricsPanelTouchStart(e) {
+  lyricsPanelTouchStartY = e.touches[0].clientY
+  lyricsPanelTouchStartTime = Date.now()
+}
+
+function onLyricsPanelTouchEnd(e) {
+  const dy = e.changedTouches[0].clientY - lyricsPanelTouchStartY
+  const dt = Date.now() - lyricsPanelTouchStartTime
+  // 快速下滑（< 300ms 且 > 60px）且不是长时间慢滚动，则返回封面
+  if (dy > 60 && dt < 300) {
+    flipToCover()
+  }
+}
+
+
 </script>
 
 <style scoped>
@@ -599,6 +627,26 @@ watch(() => store.showLyricView, (val) => {
   .close-btn::after {
     content: ''; display: block; width: 36px; height: 5px;
     background: rgba(255,255,255,0.4); border-radius: 3px;
+  }
+  /* 移动端关闭按钮 */
+  .close-btn--back::after {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-left: 2px solid rgba(255,255,255,0.6);
+    border-bottom: 2px solid rgba(255,255,255,0.6);
+    transform: rotate(45deg) translateX(3px);
+    border-radius: 0;
+    background: transparent;
+  }
+  .close-btn--back {
+    left: 16px;
+    transform: none;
+    width: 36px;
+    height: 36px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
   }
 }
 

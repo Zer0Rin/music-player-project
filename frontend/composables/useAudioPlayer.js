@@ -60,6 +60,23 @@ export function useAudioPlayer() {
     }
   }
 
+
+    function recordPlay(songId, playDuration, skipped) {
+        if (!songId) return
+        if (!_apiBase) {
+            const config = useRuntimeConfig()
+            _apiBase = config.public.apiBase
+        }
+        const token = localStorage.getItem('token')
+        if (!token) return
+
+        fetch(`${_apiBase}/api/recent/${songId}?playDuration=${Math.floor(playDuration)}&skipped=${skipped}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => {})
+    }
+
+
     function init() {
         if (_audio) {
             startRAF()
@@ -115,6 +132,11 @@ export function useAudioPlayer() {
 
   /** 播放结束处理（根据播放模式） */
   function handlePlayEnd() {
+      const song = store.currentSong
+      if (song && _audio) {
+          recordPlay(song.id, _audio.duration || 0, false)
+      }
+
       if (store.playMode === 'loop-one') {
           if (_audio) {
               _audio.currentTime = 0
@@ -122,7 +144,7 @@ export function useAudioPlayer() {
               store.isPlaying = true
           }
       } else {
-          store.nextSong(true) // 传 true，告知是自然播完
+          store.nextSong(true)
       }
   }
 
@@ -210,9 +232,15 @@ export function useAudioPlayer() {
     else pause()
   })
 
-  watch(() => store.currentSong, (song) => {
-    if (song) loadAndPlay(song.id)
-  })
+    watch(() => store.currentSong, (song, prevSong) => {
+        if (prevSong && _audio && store.playMode !== 'loop-one') {
+            const duration = _audio.duration || 0
+            const played = _audio.currentTime || 0
+            const skipped = duration > 0 && (played / duration) < 0.2
+            recordPlay(prevSong.id, played, skipped)
+        }
+        if (song) loadAndPlay(song.id)
+    })
 
   function destroy() {
       if (rafId) clearInterval(rafId)
