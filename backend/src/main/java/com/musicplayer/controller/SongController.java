@@ -231,7 +231,7 @@ public class SongController {
 
 
 
-    //歌词搜索歌
+    //歌词搜索
     @GetMapping("/search/lyrics")
     public List<Map<String, Object>> searchByLyrics(@RequestParam String q) {
         if (q == null || q.isBlank()) return List.of();
@@ -244,26 +244,52 @@ public class SongController {
             try {
                 Path lyricsPath = musicService.getLyricsPath(song.getLyricsFile());
                 if (!Files.exists(lyricsPath)) continue;
-                String raw = Files.readString(lyricsPath, StandardCharsets.UTF_8);
-                System.out.println("[LyricsDebug] raw: " + raw.substring(0, Math.min(200, raw.length())));
-                // 去时间轴
+
+                String raw;
+                try {
+                    raw = Files.readString(lyricsPath, StandardCharsets.UTF_8);
+                } catch (java.nio.charset.MalformedInputException e) {
+                    raw = new String(Files.readAllBytes(lyricsPath),
+                            java.nio.charset.Charset.forName("GBK"));
+                }
+
                 String text = Arrays.stream(raw.split("\n"))
-                        .filter(line -> {
-                            String trimmed = line.trim();
-                            // 只保留 LRC 时间轴行，跳过 JSON 行和元数据行
-                            return trimmed.matches("^\\[\\d{2}:\\d{2}[.:].+\\].*")
-                                    && !trimmed.startsWith("{");
+                        .map(line -> line.trim())
+                        // 跳过 JSON 元信息行（网易云混合格式）
+                        .filter(line -> !line.startsWith("{"))
+                        // 跳过 ASS 非对话行
+                        .filter(line -> !line.startsWith("[") || line.matches("^\\[\\d+:\\d+.*"))
+                        .map(line -> {
+                            // ASS Dialogue 行：提取文字，去除所有 {\\xxx} 标签
+                            if (line.startsWith("Dialogue:")) {
+                                // 取最后一个逗号后的内容
+                                int last = line.lastIndexOf(',');
+                                String content = last >= 0 ? line.substring(last + 1) : line;
+                                return content.replaceAll("\\{[^}]*\\}", "").trim();
+                            }
+                            // SRT 时间行跳过
+                            if (line.matches("\\d+:\\d+:\\d+[,.]\\d+\\s*-->.*")) return "";
+                            // SRT 序号行跳过
+                            if (line.matches("^\\d+$")) return "";
+                            // LRC/ELRC 行：去行首时间戳 [mm:ss.ms]
+                            String stripped = line.replaceAll("^\\[\\d+:\\d+[.:]\\d+\\]", "");
+                            // 去行内时间戳（LDDC 逐字格式）[mm:ss.ms]
+                            stripped = stripped.replaceAll("\\[\\d+:\\d+[.:]\\d+\\]", "");
+                            // 去 ESlyric 逐字时间戳 <mm:ss.ms>
+                            stripped = stripped.replaceAll("<\\d+:\\d+[.:]\\d+>", "");
+                            // 去 ELRC {offset} 标记
+                            stripped = stripped.replaceAll("\\{[\\d.]+\\}", "");
+                            // 去斜杠翻译右侧（保留原文，去翻译）
+                            int slashIdx = stripped.indexOf(" / ");
+                            if (slashIdx >= 0) stripped = stripped.substring(0, slashIdx);
+                            return stripped.trim();
                         })
-                        .map(line -> line.replaceAll("^\\[\\d{2}:\\d{2}[.:]\\d{2,3}\\]", "")) // 去时间轴
-                        .map(line -> line.replaceAll("\\{[^}]*\\}", ""))                        // 去 ELRC 逐字
-                        .map(line -> line.replaceAll("\\[.*?\\]", ""))                          // 去其他标签
-                        .map(String::trim)
                         .filter(l -> !l.isBlank())
                         .collect(Collectors.joining(" "));
 
                 if (!text.toLowerCase().contains(keyword)) continue;
 
-                // 提取匹配片段（关键词前后各20字）
+                // 提取匹配片段
                 int idx = text.toLowerCase().indexOf(keyword);
                 int start = Math.max(0, idx - 15);
                 int end = Math.min(text.length(), idx + keyword.length() + 30);

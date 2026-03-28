@@ -11,31 +11,18 @@ let cachedSongId = null
 let lastVideoState = null
 let eventsRegistered = false
 
-const isPip = ref(false)  // 统一用这一个
+const isPip = ref(false)
 
 export function usePictureInPicture() {
     const store = usePlayerStore()
 
-    // 监听切歌
+    // 监听切歌，预加载封面
     watch(() => store.currentSong?.id, async (newId, oldId) => {
         if (!newId || newId === oldId) return
         cachedSongId = newId
         cachedCoverImg = null
-
         if (!isPip.value) return
-
-        try {
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
-            await new Promise((resolve, reject) => {
-                img.onload = resolve
-                img.onerror = reject
-                img.src = `http://localhost:8080/api/songs/${newId}/cover?t=${Date.now()}`
-            })
-            cachedCoverImg = img
-        } catch (e) {
-            cachedCoverImg = null
-        }
+        await loadCoverIfNeeded(newId)
     }, { immediate: false })
 
     function initCanvas() {
@@ -50,7 +37,7 @@ export function usePictureInPicture() {
         pipVideo.srcObject = pipStream
         pipVideo.muted = true
         pipVideo.play().then(() => {
-            pipVideo.muted = false  // 播放成功后立刻取消静音
+            pipVideo.muted = false
         })
         pipVideo.addEventListener('volumechange', () => {
             setAudioMuted(pipVideo.muted)
@@ -73,12 +60,14 @@ export function usePictureInPicture() {
         if (cachedSongId === songId && cachedCoverImg) return
         cachedSongId = songId
         try {
+            const config = useRuntimeConfig()
+            const apiBase = config.public.apiBase
             const img = new Image()
             img.crossOrigin = 'anonymous'
             await new Promise((resolve, reject) => {
                 img.onload = resolve
                 img.onerror = reject
-                img.src = `http://localhost:8080/api/songs/${songId}/cover?t=${Date.now()}`
+                img.src = `${apiBase}/api/songs/${songId}/cover?t=${Date.now()}`
             })
             cachedCoverImg = img
         } catch (e) {
@@ -91,14 +80,18 @@ export function usePictureInPicture() {
         const ctx = pipCtx
         const W = 480, H = 270
 
+        // 纯黑底
         ctx.fillStyle = '#0a0a0a'
         ctx.fillRect(0, 0, W, H)
 
         if (cachedCoverImg) {
+            // 模糊背景
             ctx.save()
             ctx.filter = 'blur(20px) brightness(0.4)'
             ctx.drawImage(cachedCoverImg, -20, -20, W + 40, H + 40)
             ctx.restore()
+
+            // 左侧封面（正方形圆角）
             const size = H - 40
             ctx.save()
             roundRect(ctx, 20, 20, size, size, 12)
@@ -107,40 +100,32 @@ export function usePictureInPicture() {
             ctx.restore()
         }
 
+        // 右侧文字区
         const textX = H + 10
         const textW = W - H - 20
 
+        // 歌名
         ctx.fillStyle = '#ffffff'
         ctx.font = 'bold 20px system-ui, sans-serif'
         ctx.fillText(truncate(store.currentSong.title || '', 22), textX, 70, textW)
 
+        // 艺术家
         ctx.fillStyle = 'rgba(255,255,255,0.6)'
         ctx.font = '15px system-ui, sans-serif'
         ctx.fillText(truncate(store.currentSong.artist || '', 26), textX, 100, textW)
 
+        // 播放状态
         ctx.fillStyle = store.isPlaying ? '#4ade80' : 'rgba(255,255,255,0.4)'
         ctx.fillText(store.isPlaying ? '▶ 播放中' : '⏸ 已暂停', textX, 130, textW)
 
-        // 当前歌词
-        const currentLyric = store.parsedLyrics[store.currentLyricIndex]
-        if (currentLyric?.original?.text) {
-            ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        // 当前歌词行（由 player.js 的 updateTime 实时更新，已去除所有格式标记）
+        if (store.currentLyricText) {
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'
             ctx.font = '14px system-ui, sans-serif'
-            ctx.fillText(
-                truncate(currentLyric.original.text, 20),
-                textX, 158, textW
-            )
-            // 翻译（如果有）
-            if (currentLyric.translation?.text) {
-                ctx.fillStyle = 'rgba(255,255,255,0.45)'
-                ctx.font = '12px system-ui, sans-serif'
-                ctx.fillText(
-                    truncate(currentLyric.translation.text, 24),
-                    textX, 178, textW
-                )
-            }
+            ctx.fillText(truncate(store.currentLyricText, 24), textX, 158, textW)
         }
 
+        // 进度条
         const barY = H - 40
         const barW = textW
         ctx.fillStyle = 'rgba(255,255,255,0.15)'
@@ -151,6 +136,7 @@ export function usePictureInPicture() {
         roundRect(ctx, textX, barY, barW * store.progress, 5, 3)
         ctx.fill()
 
+        // 时间
         ctx.fillStyle = 'rgba(255,255,255,0.5)'
         ctx.font = '12px monospace'
         ctx.textAlign = 'left'
