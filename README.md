@@ -34,7 +34,7 @@
 - 沉浸式全屏歌词界面（LiquidUI 玻璃拟物风）
 <img width="2555" height="1183" alt="image" src="https://github.com/user-attachments/assets/a1e3b410-96c9-45bb-8b3b-3d5a353be915" />
 
-- 沉浸式全屏歌词界面（AMLL -https://github.com/amll-dev/applemusic-like-lyrics/tree/full-refractor）
+- 沉浸式全屏歌词界面（AMLL）
 <img width="2141" height="1195" alt="image" src="https://github.com/user-attachments/assets/2cf63ef7-5994-4d16-8cb8-7d9fcd2952db" />
 
 
@@ -350,6 +350,9 @@ Spring Data JPA 使用 `ddl-auto: update` 自动维护表结构。
 4. **侵权处理**：如果您是相关数字资产的版权所有者，且认为本项目的演示截图不当使用了您的版权物，请通过 Issue 或邮件联系本人，我将在核实后第一时间删除并替换相关视觉素材。
 
 ---
+
+## 感谢 (Thanks)
+ -https://github.com/amll-dev/applemusic-like-lyrics/tree/full-refractor
 
 <div align="center">
 Made with ❤️ and 🎵
