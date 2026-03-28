@@ -28,11 +28,15 @@
 - 48 柱频谱可视化
 
 ### 🎤 歌词系统 / Lyrics
-- 支持标准 LRC、扩展 ELRC 逐字、双语歌词三种格式
+- 支持标准 LRC（逐行）/LRC 逐字（LDDC 风格）/增强型 LRC（ESlyric/LRC+）/SRT/ASS
 - 逐字 / 逐行两种高亮模式自动切换
 - 准星点击歌词跳转播放，鼠标滚轮自由浏览
 - 沉浸式全屏歌词界面（LiquidUI 玻璃拟物风）
 <img width="2555" height="1183" alt="image" src="https://github.com/user-attachments/assets/a1e3b410-96c9-45bb-8b3b-3d5a353be915" />
+
+- 沉浸式全屏歌词界面（AMLL）
+<img width="2141" height="1195" alt="image" src="https://github.com/user-attachments/assets/2cf63ef7-5994-4d16-8cb8-7d9fcd2952db" />
+
 
 ### 🤖 AI 能力 / AI Features
 - **AI DJ**：根据用户输入语境智能生成歌单，搜索本地曲库匹配
@@ -346,6 +350,9 @@ Spring Data JPA 使用 `ddl-auto: update` 自动维护表结构。
 4. **侵权处理**：如果您是相关数字资产的版权所有者，且认为本项目的演示截图不当使用了您的版权物，请通过 Issue 或邮件联系本人，我将在核实后第一时间删除并替换相关视觉素材。
 
 ---
+
+## 感谢 (Thanks)
+ -https://github.com/amll-dev/applemusic-like-lyrics/tree/full-refractor
 
 <div align="center">
 Made with ❤️ and 🎵
