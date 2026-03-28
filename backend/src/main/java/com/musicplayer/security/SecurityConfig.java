@@ -90,6 +90,9 @@ public class SecurityConfig {
 
                         //日推歌单
                         .requestMatchers("/api/daily/recommend").authenticated()
+                        //日推刷新
+                        .requestMatchers("/api/daily/recommend").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/daily/recommend/refresh").authenticated() // 新增
 
                         .anyRequest().authenticated()
                 )

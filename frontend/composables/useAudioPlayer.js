@@ -236,7 +236,8 @@ export function useAudioPlayer() {
         if (prevSong && _audio && store.playMode !== 'loop-one') {
             const duration = _audio.duration || 0
             const played = _audio.currentTime || 0
-            const skipped = duration > 0 && (played / duration) < 0.2
+            // 只有听了不到15秒才算跳过，避免误判
+            const skipped = duration > 0 && played < 15
             recordPlay(prevSong.id, played, skipped)
         }
         if (song) loadAndPlay(song.id)

@@ -85,4 +85,12 @@ public class Song {
     public long getHotScoreUpdatedAt() { return hotScoreUpdatedAt; }
     public void setHotScoreUpdatedAt(long hotScoreUpdatedAt) { this.hotScoreUpdatedAt = hotScoreUpdatedAt; }
 
+    // RAG
+
+    @Column(columnDefinition = "TEXT")
+    private String embedding; // JSON float数组，如 "[0.12, -0.34, ...]"
+
+    public String getEmbedding() { return embedding; }
+    public void setEmbedding(String embedding) { this.embedding = embedding; }
+
 }

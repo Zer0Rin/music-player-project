@@ -37,12 +37,19 @@ public class MusicService {
 
     private final AiCommentService aiCommentService;
 
+    private final EmbeddingService embeddingService;
+    private final VectorSearchService vectorSearchService;
+
     public MusicService(SongRepository songRepository,
                         PlaylistRepository playlistRepository,
-                        @Lazy AiCommentService aiCommentService) {
+                        @Lazy AiCommentService aiCommentService,
+                        EmbeddingService embeddingService,
+                        VectorSearchService vectorSearchService) {
         this.songRepository = songRepository;
         this.playlistRepository = playlistRepository;
         this.aiCommentService = aiCommentService;
+        this.embeddingService = embeddingService;
+        this.vectorSearchService = vectorSearchService;
         Logger.getLogger("org.jaudiotagger").setLevel(Level.OFF);
     }
 
@@ -86,6 +93,7 @@ public class MusicService {
                 String fileName = audioFile.getFileName().toString();
                 String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
 
+                //RAG
                 Song existing = dbSongs.get(fileName);
                 if (existing != null) {
                     // 已有歌曲：只更新外部歌词/封面文件关联（不重新读 ID3，避免覆盖用户修改）
@@ -100,11 +108,26 @@ public class MusicService {
 
                     Song saved = songRepository.save(song);
                     CompletableFuture.runAsync(() -> {
+                        // AI 评论
                         try {
                             aiCommentService.generateAndSaveComment(saved.getId());
                             System.out.println("[MusicService] AI 评论已生成: " + saved.getTitle());
                         } catch (Exception e) {
                             System.err.println("[MusicService] AI 评论生成失败: " + e.getMessage());
+                        }
+                        // Embedding 生成
+                        try {
+                            String text = saved.getTitle() + " " + saved.getArtist()
+                                    + " " + saved.getAlbum() + " " + saved.getGenre();
+                            float[] vec = embeddingService.embed(text.trim());
+                            if (vec != null) {
+                                saved.setEmbedding(embeddingService.toJson(vec));
+                                songRepository.save(saved);
+                                vectorSearchService.addToIndex(saved.getId(), vec);
+                                System.out.println("[MusicService] Embedding 已生成: " + saved.getTitle());
+                            }
+                        } catch (Exception e) {
+                            System.err.println("[MusicService] Embedding 生成失败: " + e.getMessage());
                         }
                     });
 

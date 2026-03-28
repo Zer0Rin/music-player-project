@@ -1092,7 +1092,7 @@ function playDailyRecommend() {
 .hot-arrow:hover { background: rgba(255,255,255,0.25); }
 .hot-arrow.left { left: -14px; }
 .hot-arrow.right { right: -14px; }
-.hot-card { flex-shrink: 0; width: 130px; border-radius: 12px; padding: 8px; cursor: pointer; transition: all 0.3s ease; }
+.hot-card { flex-shrink: 0; width: 160px; border-radius: 12px; padding: 8px; cursor: pointer; transition: all 0.3s ease; }
 .hot-card:hover { transform: translateY(-4px); }
 .hot-cover-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; margin-bottom: 7px; }
 .hot-cover { width: 100%; height: 100%; object-fit: cover; }

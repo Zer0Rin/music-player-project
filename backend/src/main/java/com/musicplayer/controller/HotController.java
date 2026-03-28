@@ -71,7 +71,7 @@ public class HotController {
                 })
                 .filter(m -> (int)m.get("hotScore") > 0)
                 .sorted((a, b) -> (int)b.get("hotScore") - (int)a.get("hotScore"))
-                .limit(10)
+                .limit(5)
                 .collect(Collectors.toList());
 
         // 2. 热门歌曲

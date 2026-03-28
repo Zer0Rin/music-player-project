@@ -21,6 +21,14 @@
             </div>
             <div class="admin-topbar-right">
 
+              <!-- 日推刷新 -->
+              <button class="upload-toggle-btn liquid-btn" @click="refreshDailyRecommend" :disabled="isRefreshingDaily" title="强制刷新今日推荐">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                </svg>
+                {{ isRefreshingDaily ? '生成中...' : '日推' }}
+              </button>
+
               <!-- 热度刷新 -->
               <button class="upload-toggle-btn liquid-btn" @click="refreshHotScore" :disabled="isRefreshingHot" title="刷新热度分">
                 <svg class="w-4 h-4" :style="isRefreshingHot ? 'animation: spin 1s linear infinite' : ''"
@@ -848,6 +856,22 @@ async function refreshHotScore() {
     console.error('热度刷新失败', e)
   } finally {
     isRefreshingHot.value = false
+  }
+}
+
+
+//日推刷新
+const isRefreshingDaily = ref(false)
+
+async function refreshDailyRecommend() {
+  if (isRefreshingDaily.value) return
+  isRefreshingDaily.value = true
+  try {
+    await $apiFetch('/api/daily/recommend/refresh', { method: 'POST' })
+  } catch (e) {
+    console.error('日推刷新失败', e)
+  } finally {
+    isRefreshingDaily.value = false
   }
 }
 

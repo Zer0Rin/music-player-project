@@ -24,6 +24,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.Arrays;
 
+import com.musicplayer.service.EmbeddingService;
+import com.musicplayer.service.VectorSearchService;
+
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
@@ -32,10 +35,18 @@ public class SongController {
     private final HotScoreService hotScoreService;
     private final SongRepository songRepository;
 
-    public SongController(MusicService musicService, HotScoreService hotScoreService, SongRepository songRepository) {
+    private final EmbeddingService embeddingService;
+    private final VectorSearchService vectorSearchService;
+
+    public SongController(MusicService musicService, HotScoreService hotScoreService,
+                          SongRepository songRepository,
+                          EmbeddingService embeddingService,
+                          VectorSearchService vectorSearchService) {
         this.musicService = musicService;
         this.hotScoreService = hotScoreService;
         this.songRepository = songRepository;
+        this.embeddingService = embeddingService;
+        this.vectorSearchService = vectorSearchService;
     }
 
     @GetMapping
@@ -309,6 +320,40 @@ public class SongController {
         return results;
     }
 
+    @PostMapping("/admin/reindex")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> reindexEmbeddings() {
+        List<Song> songs = songRepository.findAll();
+        int success = 0, skip = 0, fail = 0;
 
+        for (Song song : songs) {
+            // 已有 embedding 的跳过
+            if (song.getEmbedding() != null) { skip++; continue; }
+
+            try {
+                String text = (song.getTitle() + " " + song.getArtist()
+                        + " " + song.getAlbum() + " " + song.getGenre()).trim();
+                float[] vec = embeddingService.embed(text);
+                if (vec != null) {
+                    song.setEmbedding(embeddingService.toJson(vec));
+                    songRepository.save(song);
+                    vectorSearchService.addToIndex(song.getId(), vec);
+                    success++;
+                } else {
+                    fail++;
+                }
+            } catch (Exception e) {
+                System.err.println("[Reindex] 失败: " + song.getTitle() + " - " + e.getMessage());
+                fail++;
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "total", songs.size(),
+                "success", success,
+                "skipped", skip,
+                "failed", fail
+        ));
+    }
 
 }

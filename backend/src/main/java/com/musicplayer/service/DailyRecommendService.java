@@ -44,140 +44,120 @@ public class DailyRecommendService {
     /**
      * 获取今日推荐，有缓存直接返回，无缓存则生成
      */
+
     public List<String> getDailyRecommend(String userId) {
         String today = LocalDate.now().toString();
-
-        // 命中缓存直接返回
         Optional<DailyRecommendEntity> cached =
-                dailyRecommendRepository.findByUserIdAndDate(userId, today);
+                dailyRecommendRepository.findFirstByUserIdAndDate(userId, today);
         if (cached.isPresent()) {
             return cached.get().getSongIds();
         }
+        return generateAndCache(userId, today);
+    }
 
-        // 生成今日推荐
+    //刷新日推
+    public List<String> refreshDailyRecommend(String userId) {
+        String today = LocalDate.now().toString();
+        // 删除今天所有缓存（防止重复记录）
+        List<DailyRecommendEntity> existing = dailyRecommendRepository.findAllByUserIdAndDate(userId, today);
+        if (!existing.isEmpty()) dailyRecommendRepository.deleteAll(existing);
         return generateAndCache(userId, today);
     }
 
     private List<String> generateAndCache(String userId, String date) {
         System.out.println("[DailyRecommend] 开始生成用户: " + userId);
 
-        // 收藏歌曲（权重×3）
         List<String> favoriteSongIds = playlistRepository.findAll().stream()
-                .filter(pl -> pl.isSystem()
-                        && "我喜欢".equals(pl.getName())
-                        && userId.equals(pl.getUserId()))
+                .filter(pl -> pl.isSystem() && "我喜欢".equals(pl.getName()) && userId.equals(pl.getUserId()))
                 .findFirst()
                 .map(Playlist::getSongIds)
-                .orElse(List.of());
-        System.out.println("[DailyRecommend] 收藏歌曲数: " + favoriteSongIds.size());
+                .orElse(List.of())
+                .stream()
+                .limit(20)  // 收藏20首
+                .collect(Collectors.toList());
 
-        // 歌单中的歌曲（权重×2）
         List<String> playlistSongIds = playlistRepository.findAll().stream()
                 .filter(pl -> !pl.isSystem() && userId.equals(pl.getUserId()))
                 .flatMap(pl -> pl.getSongIds().stream())
                 .distinct()
+                .limit(20)  // 最多取20首，避免歌单过大占满上下文
                 .collect(Collectors.toList());
-        System.out.println("[DailyRecommend] 歌单歌曲数: " + playlistSongIds.size());
 
-        // 最近播放（权重×1）
         List<String> recentSongIds = recentPlayRepository
                 .findByUserIdOrderByPlayedAtDesc(userId)
                 .stream()
                 .limit(20)
                 .map(RecentPlay::getSongId)
                 .collect(Collectors.toList());
-        System.out.println("[DailyRecommend] 最近播放数: " + recentSongIds.size());
 
-        // 采样（必须在空判断之前）
         List<String> sampleSongs = buildSampleDescription(favoriteSongIds, playlistSongIds, recentSongIds);
-        System.out.println("[DailyRecommend] 采样歌曲数: " + sampleSongs.size());
-
         if (sampleSongs.isEmpty()) {
             System.out.println("[DailyRecommend] 无行为数据，走热度兜底");
             return fallbackHot(10);
         }
 
-        // 构建 prompt
-        String prompt = "用户的音乐偏好数据如下：\n\n" +
-                "最喜欢的歌曲（权重最高）：\n" +
-                getSongDescriptions(favoriteSongIds, 8) + "\n\n" +
-                "用户整理进歌单的歌曲（权重中等）：\n" +
-                getSongDescriptions(playlistSongIds, 6) + "\n\n" +
-                "最近播放记录（权重较低）：\n" +
-                getSongDescriptions(recentSongIds, 5) + "\n\n" +
-                "请分析用户的音乐口味，使用 searchLocalMusic 工具搜索曲库，" +
-                "推荐10首用户可能喜欢但未出现在以上列表中的新歌。" +
-                "多搜几次不同关键词以扩大候选范围。";
+        // 构建已听过的歌曲集合（用于排除）
+        Set<String> listenedIds = new HashSet<>(sampleSongs);
+
+        // 只把歌曲描述给 AI 提炼风格，不让它直接推荐这些歌
+        String favoriteDesc = getSongDescriptions(favoriteSongIds, 8);
+        String playlistDesc = getSongDescriptions(playlistSongIds, 5);
+        String recentDesc = getSongDescriptions(recentSongIds, 4);
+
+        String systemPrompt = "你是一个精准的音乐推荐引擎。" +
+                "根据用户的听歌偏好，使用 searchLocalMusic 工具在本地曲库中搜索并推荐10首新歌。\n" +
+                "规则：\n" +
+                "1. 必须使用 searchLocalMusic 工具搜索，最多搜索3次，每次用不同维度的关键词。\n" +
+                "2. 禁止推荐用户已听过或收藏的歌曲。\n" +
+                "3. 禁止推荐不存在于搜索结果中的歌曲。\n" +
+                "4. 只返回纯JSON，包含songs数组，每个元素有id、title、artist三个字段。";
+
+        String userPrompt = "用户音乐偏好：\n" +
+                "最喜欢（权重高）：" + favoriteDesc + "\n" +
+                "自建歌单（权重中）：" + playlistDesc + "\n" +
+                "最近播放（权重低）：" + recentDesc + "\n\n" +
+                "请分析用户口味，搜索并推荐10首风格相似但用户未听过的新歌。";
 
         System.out.println("[DailyRecommend] 开始调用 AI...");
 
-
-
-        // 调用 AI
         try {
-            String systemPrompt = "你是一个精准的音乐推荐引擎。" +
-                    "根据用户的听歌偏好，在本地曲库中搜索并推荐10首他可能喜欢的歌曲。\n" +
-                    "规则：必须使用 searchLocalMusic 工具搜索，" +
-                    "禁止推荐用户已听过或收藏的歌曲，" +
-                    "禁止推荐不存在的歌曲，" +
-                    "返回纯JSON格式：" +
-                    "{\"songs\": [{\"id\": \"x\", \"title\": \"x\", \"artist\": \"x\"}]}";
-
-            System.out.println("[DailyRecommend] systemPrompt: " + systemPrompt);
-
-            String safeSystem = systemPrompt
-                    .replace("[", "")
-                    .replace("]", "")
-                    .replace("{", "")
-                    .replace("}", "");
-
-            String safePrompt = prompt
-                    .replace("[", "")
-                    .replace("]", "")
-                    .replace("{", "")
-                    .replace("}", "");
-
-
-            System.out.println("[DailyRecommend] 开始调用 AI...");
+            String safeSystem = systemPrompt.replace("{", "\\{").replace("}", "\\}");
+            String safeUser = userPrompt.replace("[", "\\[").replace("]", "\\]");
 
             String response = chatClient.prompt()
                     .system(safeSystem)
-                    .user(safePrompt)
+                    .user(safeUser)
                     .call()
                     .content();
 
             System.out.println("[DailyRecommend] AI 返回: " + response);
 
-            String cleaned = response;
-            // 提取 { "songs": [...] } 部分
+            // 提取 JSON
             int start = response.indexOf("{");
             int end = response.lastIndexOf("}");
-            if (start != -1 && end != -1 && end > start) {
-                cleaned = response.substring(start, end + 1);
-            } else {
+            if (start == -1 || end == -1 || end <= start) {
                 System.err.println("[DailyRecommend] 无法提取 JSON");
                 return fallbackHot(10);
             }
+            String cleaned = response.substring(start, end + 1);
 
             JsonNode root = objectMapper.readTree(cleaned);
-
             JsonNode songsNode = root.get("songs");
 
             List<String> songIds = new ArrayList<>();
             if (songsNode != null && songsNode.isArray()) {
                 for (JsonNode s : songsNode) {
                     String id = s.get("id").asText();
-                    if (songRepository.existsById(id)) {
+                    // 双重校验：数据库存在 且 用户未听过
+                    if (songRepository.existsById(id) && !listenedIds.contains(id)) {
                         songIds.add(id);
                     }
                 }
             }
 
             System.out.println("[DailyRecommend] 有效歌曲数: " + songIds.size());
-
             if (songIds.isEmpty()) return fallbackHot(10);
 
-            // 缓存到数据库
             DailyRecommendEntity entity = new DailyRecommendEntity();
             entity.setUserId(userId);
             entity.setDate(date);

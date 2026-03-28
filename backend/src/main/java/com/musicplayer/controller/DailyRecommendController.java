@@ -45,4 +45,30 @@ public class DailyRecommendController {
                 "songs", songs
         );
     }
+
+    //日推刷新
+    @PostMapping("/recommend/refresh")
+    public Map<String, Object> refreshDailyRecommend(Authentication auth) {
+        String userId = auth.getName();
+        List<String> songIds = dailyRecommendService.refreshDailyRecommend(userId);
+
+        List<Map<String, Object>> songs = songIds.stream()
+                .map(id -> songRepository.findById(id).orElse(null))
+                .filter(Objects::nonNull)
+                .map(s -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", s.getId());
+                    map.put("title", s.getTitle());
+                    map.put("artist", s.getArtist());
+                    map.put("coverFile", s.getCoverFile());
+                    return map;
+                })
+                .toList();
+
+        return Map.of(
+                "date", java.time.LocalDate.now().toString(),
+                "songs", songs
+        );
+    }
+
 }
