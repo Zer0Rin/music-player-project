@@ -19,9 +19,15 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
+
 @RestController
 @RequestMapping("/api/ai/analysis")
 public class AiSongAnalysisController {
+
+    private static final Logger log = LoggerFactory.getLogger(AiSongAnalysisController.class);
 
     private final ChatClient chatClient;
     private final MusicService musicService;
@@ -80,9 +86,25 @@ public class AiSongAnalysisController {
         String lyrics = readLyricsText(song);
         String prompt = buildPrompt(song, lyrics);
 
+        // 客户端断开（关标签页 / 断网 / 切歌）时释放上游订阅。
+        //
+        // ⚠️ 实测限制（不要高估这个修复）：dispose 之后**上游 HTTP 连接并不会被及时关闭**。
+        // 用本地桩模型验证：客户端在读 48 字节后断开，应用侧回调确实触发、订阅确实被 dispose，
+        // 但对端在 18 秒里把 60 段（每段约 60KB）全部写成功 —— 说明连接仍被读取，
+        // provider 侧仍会继续生成。也就是说：这个修复解决的是"我们这边不要继续处理、不要继续往
+        // 已断开的客户端写"，**不能**据此宣称"停止计费"。
+        // 真正封顶成本要靠 provider 侧的额度/上限，或给 WebClient 配一个读超时。
+        UpstreamSubscriptionGuard upstream = new UpstreamSubscriptionGuard();
+        emitter.onCompletion(() -> releaseUpstream(upstream, songId, "客户端断开或流已结束"));
+        emitter.onError(error -> releaseUpstream(upstream, songId, "SSE 出错"));
+        emitter.onTimeout(() -> {
+            releaseUpstream(upstream, songId, "SSE 超时");
+            emitter.complete();
+        });
+
         CompletableFuture.runAsync(() -> {
             try {
-                chatClient.prompt()
+                Disposable subscription = chatClient.prompt()
                         .user(prompt)
                         .stream()
                         .chatResponse()
@@ -92,6 +114,7 @@ public class AiSongAnalysisController {
                                 try {
                                     emitter.send(SseEmitter.event().data(text));
                                 } catch (IOException e) {
+                                    // 客户端已断开：结束 emitter，由上面的回调释放上游订阅
                                     emitter.completeWithError(e);
                                 }
                             }
@@ -99,13 +122,27 @@ public class AiSongAnalysisController {
                         .doOnComplete(emitter::complete)
                         .doOnError(emitter::completeWithError)
                         .subscribe();
+                // 竞态：客户端可能在 subscribe() 返回之前就断开了，register 会就地取消
+                upstream.register(subscription);
             } catch (Exception e) {
                 emitter.completeWithError(e);
             }
         });
 
-        emitter.onTimeout(emitter::complete);
         return emitter;
+    }
+
+    /**
+     * 释放上游订阅，避免继续处理已无人接收的数据。
+     *
+     * <p>只有真的释放掉一个已建立的订阅时才记 INFO——这样"断开是否被处理到"在日志里是可见的。
+     * <b>注意这条日志不代表计费已停止</b>：实测上游 HTTP 连接不会因此及时关闭，
+     * 详见本类 analyze() 里的说明。
+     */
+    private void releaseUpstream(UpstreamSubscriptionGuard upstream, String songId, String reason) {
+        if (upstream.release()) {
+            log.info("[AI 解析] 已释放上游订阅 songId={} reason={}", songId, reason);
+        }
     }
 
     /** 读取歌词文件并去除时间轴标签，返回纯文本 */
