@@ -3,12 +3,14 @@ package com.musicplayer.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -33,6 +35,11 @@ public class SecurityConfig {
                 .cors(org.springframework.security.config.Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 未认证时返回 401 而不是默认的 403：
+                // 前端 plugins/auth.js 只在 401 时清理 token 并跳转登录，403 只记录日志。
+                // 若这里返回 403，token 过期后用户会停在页面上反复失败而不会被引导重新登录。
+                .exceptionHandling(e -> e.authenticationEntryPoint(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         // 关键修复 2：无条件放行所有跨域的 OPTIONS 预检请求！
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -40,8 +47,8 @@ public class SecurityConfig {
                         // 登录注册放行
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        //  AI DJ 接口发“免死金牌”，允许所有人调用
-                        .requestMatchers("/api/ai-dj/**").permitAll()
+                        // AI DJ 会调用付费模型：必须登录，并由 AiRateLimitInterceptor 按用户限流
+                        .requestMatchers("/api/ai-dj/**").authenticated()
                         .requestMatchers("/error").permitAll()
 
                         //分享码
@@ -79,8 +86,8 @@ public class SecurityConfig {
                         // 最近 歌曲
                         .requestMatchers("/api/recent/**").authenticated()
 
-                        //AI 歌词分析
-                        .requestMatchers("/api/ai/analysis/**").permitAll()
+                        //AI 歌词分析（SSE，前端通过 ?token= 传 JWT）：同样会调用付费模型，必须登录
+                        .requestMatchers("/api/ai/analysis/**").authenticated()
 
                         //AI乐评人
                         .requestMatchers("/api/ai-comment/generate/**").hasRole("ADMIN")

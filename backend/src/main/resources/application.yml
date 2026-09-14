@@ -15,6 +15,12 @@ app:
   admin:
     username: ${ADMIN_USERNAME:admin}
     password: ${ADMIN_PASSWORD:admin123}
+  ai:
+    # 会真实调用付费模型的接口（/api/ai-dj、/api/ai/analysis、/api/ai-comment）的限流。
+    # 按用户计；未登录按来源地址计。单实例内存计数，多实例部署需换成共享存储。
+    rate-limit:
+      per-minute: 10
+      window-seconds: 60
 
 
 siliconflow:
