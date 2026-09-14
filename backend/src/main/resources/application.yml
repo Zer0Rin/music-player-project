@@ -21,6 +21,9 @@ app:
     rate-limit:
       per-minute: 10
       window-seconds: 60
+    # SSE 用的一次性票据：EventSource 无法设置请求头，用它替代把 JWT 放进 URL。
+    stream-ticket:
+      ttl-seconds: 30
 
 
 siliconflow:

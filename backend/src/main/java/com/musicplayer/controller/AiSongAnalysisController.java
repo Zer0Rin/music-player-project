@@ -1,9 +1,12 @@
 package com.musicplayer.controller;
 
 import com.musicplayer.model.Song;
+import com.musicplayer.security.StreamTicketService;
 import com.musicplayer.service.MusicService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -11,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -21,12 +25,42 @@ public class AiSongAnalysisController {
 
     private final ChatClient chatClient;
     private final MusicService musicService;
+    private final StreamTicketService streamTicketService;
 
-    public AiSongAnalysisController(ChatClient.Builder builder, MusicService musicService) {
+    public AiSongAnalysisController(ChatClient.Builder builder,
+                                    MusicService musicService,
+                                    StreamTicketService streamTicketService) {
         this.musicService = musicService;
+        this.streamTicketService = streamTicketService;
         this.chatClient = builder
                 .defaultSystem("你是一位资深音乐评论人，文字有温度、有文学性，像朋友聊音乐一样自然。")
                 .build();
+    }
+
+    /**
+     * 为 SSE 开流签发一张一次性票据。
+     *
+     * <p>浏览器的 {@code EventSource} 无法设置请求头，因此不能要求它带 Authorization。
+     * 客户端先用普通请求（带 Authorization 头）换票，再用票开流——避免把长期有效的 JWT
+     * 放进 URL 而泄漏到访问日志、浏览器历史与 Referer。
+     */
+    @PostMapping("/{songId}/ticket")
+    public ResponseEntity<Map<String, Object>> issueStreamTicket(@PathVariable String songId,
+                                                                 Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        String role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(authority -> authority.getAuthority().replaceFirst("^ROLE_", ""))
+                .orElse("USER");
+
+        StreamTicketService.Issued issued =
+                streamTicketService.issue(authentication.getName(), role, songId);
+
+        return ResponseEntity.ok(Map.of(
+                "ticket", issued.ticket(),
+                "expiresInSeconds", issued.expiresInSeconds()));
     }
 
     @GetMapping(value = "/{songId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

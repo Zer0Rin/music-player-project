@@ -99,23 +99,35 @@ function closeEventSource() {
   }
 }
 
-function startAnalysis() {
+async function startAnalysis() {
   console.log('startAnalysis called, songId:', props.songId, 'isStreaming:', isStreaming.value)
   if (isStreaming.value || !props.songId) return
   closeEventSource()
   content.value = ''
   isStreaming.value = true
 
-  const token = localStorage.getItem('token')
-  const url = `/api/ai/analysis/${props.songId}${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  try {
+    // EventSource 无法设置请求头，所以先用带 Authorization 的普通请求换一张一次性票据，
+    // 再用票据开流。不再把 JWT 放进 URL：那会让它泄漏到访问日志、浏览器历史与 Referer。
+    const res = await $apiFetch(`/api/ai/analysis/${props.songId}/ticket`, { method: 'POST' })
+    const ticket = res?.ticket
+    if (!ticket) throw new Error('未取得流式票据')
 
-  eventSource = new EventSource(url)
+    eventSource = new EventSource(
+      `/api/ai/analysis/${props.songId}?ticket=${encodeURIComponent(ticket)}`
+    )
 
-  eventSource.onmessage = (e) => {
-    content.value += e.data
-  }
+    eventSource.onmessage = (e) => {
+      content.value += e.data
+    }
 
-  eventSource.onerror = () => {
+    eventSource.onerror = () => {
+      isStreaming.value = false
+      closeEventSource()
+    }
+  } catch (err) {
+    console.error('AI 歌曲解析启动失败:', err)
+    content.value = '❌ 解析启动失败，请刷新或重新登录后再试'
     isStreaming.value = false
     closeEventSource()
   }

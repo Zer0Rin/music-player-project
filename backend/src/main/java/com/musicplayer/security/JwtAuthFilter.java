@@ -18,9 +18,11 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final StreamTicketService streamTicketService;
 
-    public JwtAuthFilter(JwtUtil jwtUtil) {
+    public JwtAuthFilter(JwtUtil jwtUtil, StreamTicketService streamTicketService) {
         this.jwtUtil = jwtUtil;
+        this.streamTicketService = streamTicketService;
     }
 
     @Override
@@ -31,33 +33,47 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        // SSE 无法设置 Header，支持 query param 传 token
-        if (header == null) {
-            String queryToken = request.getParameter("token");
-            if (queryToken != null && !queryToken.isBlank()) {
-                header = "Bearer " + queryToken;
-            }
-        }
-
         if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
-            if (jwtUtil.validateToken(token)) {
-                Claims claims = jwtUtil.parseToken(token);
-                String userId = claims.getSubject();
-                String role = claims.get("role", String.class);
-
-                var auth = new UsernamePasswordAuthenticationToken(
-                        userId,
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                );
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            }
+            authenticateWithJwt(header.substring(7));
+        } else {
+            authenticateWithStreamTicket(request);
         }
 
         filterChain.doFilter(request, response);
     }
 
+    private void authenticateWithJwt(String token) {
+        if (!jwtUtil.validateToken(token)) return;
+        Claims claims = jwtUtil.parseToken(token);
+        setAuthentication(claims.getSubject(), claims.get("role", String.class));
+    }
 
+    /**
+     * 浏览器的 {@code EventSource} 无法设置请求头，所以 SSE 接口需要一种不放进查询串的凭据。
+     *
+     * <p>这里只接受 {@link StreamTicketService} 签发的一次性票据，<b>不再接受 {@code ?token=<JWT>}</b>：
+     * 把长期有效的 JWT 放进 URL 会让它进入服务端访问日志、浏览器历史和 Referer，且在被撤销前一直可用。
+     * 票据是一次性、30 秒、且绑定到签发票据时指定的资源的。
+     */
+    private void authenticateWithStreamTicket(HttpServletRequest request) {
+        streamTicketService
+                .consume(request.getParameter("ticket"), lastPathSegment(request.getRequestURI()))
+                .ifPresent(ticket -> setAuthentication(ticket.userId(), ticket.role()));
+    }
 
+    private void setAuthentication(String userId, String role) {
+        if (userId == null || role == null) return;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+    }
+
+    /** 取 URI 的最后一段作为资源标识（例如 {@code /api/ai/analysis/<songId>} 的 songId）。 */
+    private static String lastPathSegment(String uri) {
+        if (uri == null) return null;
+        int index = uri.lastIndexOf('/');
+        return index < 0 ? uri : uri.substring(index + 1);
+    }
 }

@@ -1,5 +1,6 @@
 package com.musicplayer.security;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -41,6 +42,13 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
+                        // SSE(SseEmitter) 完成时会触发一次 ASYNC dispatch，而那次 dispatch 上
+                        // SecurityContext 已经不存在；Spring Security 6.1+ 默认连 ASYNC/ERROR
+                        // dispatch 也做鉴权，于是每条 SSE 结束时都会抛 AccessDeniedException，
+                        // 并因响应已提交而无法渲染错误页（日志里表现为 "already committed"）。
+                        // 首次 REQUEST dispatch 仍然照常鉴权，所以这里放行不放松任何权限。
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+
                         // 关键修复 2：无条件放行所有跨域的 OPTIONS 预检请求！
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
